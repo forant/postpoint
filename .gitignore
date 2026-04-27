@@ -1,0 +1,17 @@
+# Xcode
+DerivedData/
+build/
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+
+# macOS
+.DS_Store
+
+# Local databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
