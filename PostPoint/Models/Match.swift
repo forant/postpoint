@@ -63,7 +63,11 @@ extension Match {
                 notes: "Served well in the first set. Need to work on backhand returns under pressure.",
                 debriefInput: DebriefInput(
                     result: .wonClose,
-                    score: "6-4, 3-6, 7-5",
+                    scoreLines: [
+                        ScoreLine(playerScore: 6, opponentScore: 4),
+                        ScoreLine(playerScore: 3, opponentScore: 6),
+                        ScoreLine(playerScore: 7, opponentScore: 5),
+                    ],
                     matchFormat: .singles,
                     biggestProblems: [.unforcedErrors],
                     matchPattern: .longRallies,

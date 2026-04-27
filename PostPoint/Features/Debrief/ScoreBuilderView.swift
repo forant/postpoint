@@ -15,14 +15,15 @@ struct ScoreBuilderView: View {
                 .foregroundStyle(AppColors.secondaryLabel)
 
             VStack(spacing: AppSpacing.md) {
-                ForEach(Array(scoreLines.enumerated()), id: \.element.id) { index, _ in
+                ForEach($scoreLines) { $line in
+                    let index = scoreLines.firstIndex(where: { $0.id == line.id }) ?? 0
                     ScoreLineRow(
                         label: scoreLines.count > 1 ? "Set \(index + 1)" : "Score",
-                        line: $scoreLines[index],
+                        line: $line,
                         canDelete: scoreLines.count > 1
                     ) {
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            scoreLines.remove(at: index)
+                            scoreLines.removeAll { $0.id == line.id }
                         }
                     }
                 }
