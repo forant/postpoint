@@ -16,7 +16,7 @@ struct MatchRowView: View {
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 // Opponent + result badge
                 HStack {
-                    Text(match.opponentName)
+                    Text(match.displayOpponentName)
                         .font(AppFont.headline())
 
                     Spacer()
@@ -58,6 +58,7 @@ struct MatchRowView: View {
         switch match.sport {
         case .tennis: return AppColors.tennis
         case .pickleball: return AppColors.pickleball
+        case .padel: return AppColors.padel
         }
     }
 

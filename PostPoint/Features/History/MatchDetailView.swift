@@ -41,7 +41,7 @@ struct MatchDetailView: View {
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text(match.opponentName)
+                    Text(match.displayOpponentName)
                         .font(AppFont.title())
                     Text(match.date, format: .dateTime.weekday(.wide).month(.abbreviated).day().year().hour().minute())
                         .font(AppFont.caption())
@@ -87,17 +87,42 @@ struct MatchDetailView: View {
                 detailRow("Pattern", value: input.matchPattern.rawValue, icon: input.matchPattern.icon)
                 Divider()
                 detailRow("Opponent Level", value: input.opponentLevel.rawValue, icon: input.opponentLevel.icon)
-                Divider()
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    detailLabel("Biggest Problems", icon: "exclamationmark.triangle")
-                    ForEach(input.biggestProblems) { problem in
-                        HStack(spacing: AppSpacing.sm) {
-                            Image(systemName: problem.icon)
-                                .font(.caption)
-                                .foregroundStyle(AppColors.primary)
-                                .frame(width: 20)
-                            Text(problem.rawValue)
-                                .font(AppFont.body())
+
+                if !input.biggestProblems.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        detailLabel("Biggest Problems", icon: "exclamationmark.triangle")
+                        ForEach(input.biggestProblems) { problem in
+                            HStack(spacing: AppSpacing.sm) {
+                                Image(systemName: problem.icon)
+                                    .font(.caption)
+                                    .foregroundStyle(AppColors.primary)
+                                    .frame(width: 20)
+                                Text(problem.rawValue)
+                                    .font(AppFont.body())
+                            }
+                        }
+                    }
+                }
+
+                if let whatWorked = input.whatWorked {
+                    Divider()
+                    detailRow("What Worked", value: whatWorked.rawValue, icon: whatWorked.icon)
+                }
+
+                if let areas = input.improvementAreas, !areas.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        detailLabel("Areas to Improve", icon: "arrow.up.circle")
+                        ForEach(areas) { area in
+                            HStack(spacing: AppSpacing.sm) {
+                                Image(systemName: area.icon)
+                                    .font(.caption)
+                                    .foregroundStyle(AppColors.primary)
+                                    .frame(width: 20)
+                                Text(area.rawValue)
+                                    .font(AppFont.body())
+                            }
                         }
                     }
                 }
@@ -256,6 +281,7 @@ struct MatchDetailView: View {
         switch match.sport {
         case .tennis: return AppColors.tennis
         case .pickleball: return AppColors.pickleball
+        case .padel: return AppColors.padel
         }
     }
 }

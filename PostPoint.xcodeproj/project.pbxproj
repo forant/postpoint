@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E518BE3E2FA00FC600197E0F /* Mixpanel in Frameworks */ = {isa = PBXBuildFile; productRef = E518BE3D2FA00FC600197E0F /* Mixpanel */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		E518BDD32F9FDD5400197E0F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E518BE3E2FA00FC600197E0F /* Mixpanel in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 				E518BDC52F9FDD5100197E0F /* PostPoint */,
 				E518BDD52F9FDD5400197E0F /* PostPointTests */,
 				E518BDDF2F9FDD5400197E0F /* PostPointUITests */,
+				E518BE3C2FA00FC600197E0F /* Frameworks */,
 				E518BDC42F9FDD5100197E0F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +96,13 @@
 				E518BDDC2F9FDD5400197E0F /* PostPointUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E518BE3C2FA00FC600197E0F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +125,7 @@
 			);
 			name = PostPoint;
 			packageProductDependencies = (
+				E518BE3D2FA00FC600197E0F /* Mixpanel */,
 			);
 			productName = PostPoint;
 			productReference = E518BDC32F9FDD5100197E0F /* PostPoint.app */;
@@ -195,6 +209,9 @@
 			);
 			mainGroup = E518BDBA2F9FDD5100197E0F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E518BE3B2FA00F0600197E0F /* XCRemoteSwiftPackageReference "mixpanel-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E518BDC42F9FDD5100197E0F /* Products */;
 			projectDirPath = "";
@@ -578,6 +595,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E518BE3B2FA00F0600197E0F /* XCRemoteSwiftPackageReference "mixpanel-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mixpanel/mixpanel-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E518BE3D2FA00FC600197E0F /* Mixpanel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E518BE3B2FA00F0600197E0F /* XCRemoteSwiftPackageReference "mixpanel-swift" */;
+			productName = Mixpanel;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E518BDBB2F9FDD5100197E0F /* Project object */;
 }

@@ -116,6 +116,54 @@ enum NotableContext: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Win Path: What Worked (single-select)
+
+enum WhatWorked: String, Codable, CaseIterable, Identifiable {
+    case consistency = "Consistency"
+    case servePressure = "Serve pressure"
+    case returnQuality = "Return quality"
+    case movementPositioning = "Movement / positioning"
+    case netPlay = "Net play"
+    case mentalComposure = "Mental composure"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .consistency: return "arrow.left.arrow.right"
+        case .servePressure: return "bolt.fill"
+        case .returnQuality: return "arrow.uturn.left"
+        case .movementPositioning: return "figure.walk"
+        case .netPlay: return "arrow.up.and.down"
+        case .mentalComposure: return "brain.head.profile"
+        }
+    }
+}
+
+// MARK: - Win Path: Improvement Area (multi-select up to 2)
+
+enum ImprovementArea: String, Codable, CaseIterable, Identifiable {
+    case unforcedErrors = "Unforced errors"
+    case serveReturnInconsistency = "Serve/return inconsistency"
+    case rushedDecisions = "Rushed decisions"
+    case positioningMovement = "Positioning / movement"
+    case mentalLapses = "Mental lapses"
+    case couldntFinishPoints = "Couldn't finish points"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .unforcedErrors: return "xmark.circle"
+        case .serveReturnInconsistency: return "arrow.triangle.2.circlepath"
+        case .rushedDecisions: return "hare"
+        case .positioningMovement: return "figure.walk"
+        case .mentalLapses: return "brain"
+        case .couldntFinishPoints: return "flag.slash"
+        }
+    }
+}
+
 // MARK: - Question 5: Opponent Level
 
 enum OpponentLevel: String, Codable, CaseIterable, Identifiable {

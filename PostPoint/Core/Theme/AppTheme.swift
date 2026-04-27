@@ -13,6 +13,7 @@ enum AppColors {
     // Sport-specific accent colors
     static let tennis = Color.green
     static let pickleball = Color.orange
+    static let padel = Color.blue
 }
 
 // MARK: - Spacing

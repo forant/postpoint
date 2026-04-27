@@ -18,3 +18,8 @@ xcuserdata/
 
 # Secrets
 Secrets.plist
+.env
+
+# Python
+venv/
+__pycache__/

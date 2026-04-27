@@ -9,6 +9,14 @@ struct DebriefInput: Codable, Equatable {
     var opponentLevel: OpponentLevel
     var notableContexts: [NotableContext]
     var contextNote: String?
+    // Win-path fields (nil for losses)
+    var whatWorked: WhatWorked?
+    var improvementAreas: [ImprovementArea]?
+    // Schema & sport context
+    var sport: SportType = .tennis
+    var scoringSystem: ScoringSystem = .tennisSets
+    var schemaVersion: Int = 1
+    var opponentNames: [String] = []
 
     /// Formatted score string for display, or nil if no scores entered
     var scoreDisplay: String? {

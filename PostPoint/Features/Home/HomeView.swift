@@ -17,6 +17,23 @@ struct HomeView: View {
                 .padding(.top, AppSpacing.md)
             }
             .navigationTitle("PostPoint")
+            #if DEBUG
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("PostPoint")
+                        .font(.headline)
+                        .onLongPressGesture {
+                            UserDefaults.standard.removeObject(forKey: "PostPoint.playerProfile")
+                            viewModel.showOnboardingResetAlert = true
+                        }
+                }
+            }
+            .alert("Onboarding Reset", isPresented: $viewModel.showOnboardingResetAlert) {
+                Button("OK") { }
+            } message: {
+                Text("Restart the app to re-run onboarding.")
+            }
+            #endif
             .navigationDestination(for: UUID.self) { matchID in
                 if let match = matches.first(where: { $0.id == matchID }) {
                     MatchDetailView(match: match)

@@ -5,6 +5,7 @@ import SwiftUI
 @Observable
 final class HomeViewModel {
     var showingDebrief = false
+    var showOnboardingResetAlert = false
 
     func matchCount(_ matches: [Match]) -> Int {
         matches.count

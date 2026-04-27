@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DebriefSummaryView: View {
     let result: DebriefResult
+    var opponentHistoryNames: [String] = []
     let onSave: () -> Void
 
     var body: some View {
@@ -15,6 +16,16 @@ struct DebriefSummaryView: View {
 
                     Text("Your Debrief")
                         .font(AppFont.largeTitle())
+
+                    if !opponentHistoryNames.isEmpty {
+                        HStack(spacing: AppSpacing.xs) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.caption2)
+                            Text("Includes history vs \(opponentHistoryNames.joined(separator: " & "))")
+                                .font(AppFont.caption())
+                        }
+                        .foregroundStyle(AppColors.secondaryLabel)
+                    }
                 }
                 .padding(.top, AppSpacing.md)
 

@@ -12,6 +12,10 @@ struct MainTabView: View {
                 HistoryView()
             }
 
+            Tab("Opponents", systemImage: "person.2.fill") {
+                OpponentsView()
+            }
+
             Tab("Insights", systemImage: "chart.xyaxis.line") {
                 InsightsView()
             }

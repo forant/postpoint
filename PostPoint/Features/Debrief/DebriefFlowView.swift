@@ -4,6 +4,8 @@ import SwiftData
 struct DebriefFlowView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Match.date, order: .reverse) private var allMatches: [Match]
+    @Query(sort: \Opponent.createdAt, order: .reverse) private var allOpponents: [Opponent]
     @State private var viewModel = DebriefFlowViewModel()
 
     var body: some View {
@@ -14,8 +16,11 @@ struct DebriefFlowView: View {
                 } else if let error = viewModel.error {
                     errorView(error)
                 } else if let result = viewModel.debriefResult {
-                    DebriefSummaryView(result: result) {
-                        viewModel.saveMatch(to: modelContext, sport: .tennis)
+                    DebriefSummaryView(
+                        result: result,
+                        opponentHistoryNames: viewModel.opponentHistorySummary?.opponentNamesWithHistory ?? []
+                    ) {
+                        viewModel.saveMatch(to: modelContext)
                         dismiss()
                     }
                 } else {
@@ -28,6 +33,14 @@ struct DebriefFlowView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
+            }
+            .onChange(of: allMatches) {
+                viewModel.allMatches = allMatches
+            }
+            .onAppear {
+                viewModel.allMatches = allMatches
+                AnalyticsService.track(.debriefStarted)
+                AnalyticsService.track(.matchEntryStarted)
             }
         }
     }
@@ -59,8 +72,8 @@ struct DebriefFlowView: View {
 
     @ViewBuilder
     private var currentQuestion: some View {
-        switch viewModel.currentStep {
-        case 0:
+        switch viewModel.currentStepKind {
+        case .result:
             DebriefQuestionView(
                 prompt: "How did the match go?",
                 options: MatchResult.allCases,
@@ -68,10 +81,10 @@ struct DebriefFlowView: View {
                 selection: setFrom(viewModel.selectedResult)
             ) { viewModel.selectAndAdvance($0, binding: \.selectedResult) }
 
-        case 1:
+        case .score:
             ScoreBuilderView(scoreLines: $viewModel.scoreLines)
 
-        case 2:
+        case .format:
             DebriefQuestionView(
                 prompt: "What were you playing?",
                 options: MatchFormat.allCases,
@@ -79,10 +92,27 @@ struct DebriefFlowView: View {
                 selection: setFrom(viewModel.selectedFormat)
             ) {
                 viewModel.selectedProblems.removeAll()
+                viewModel.selectedImprovementAreas.removeAll()
+                viewModel.selectedWhatWorked = nil
+                // Clear second opponent when switching away from doubles
+                if $0 == .singles {
+                    viewModel.secondOpponentName = ""
+                    viewModel.secondSelectedOpponentId = nil
+                }
                 viewModel.selectAndAdvance($0, binding: \.selectedFormat)
             }
 
-        case 3:
+        case .opponent:
+            OpponentInputView(
+                opponentName: $viewModel.opponentName,
+                selectedOpponentId: $viewModel.selectedOpponentId,
+                secondOpponentName: $viewModel.secondOpponentName,
+                secondSelectedOpponentId: $viewModel.secondSelectedOpponentId,
+                opponents: sortedOpponents,
+                isDoubles: viewModel.isDoubles
+            )
+
+        case .biggestProblems:
             DebriefQuestionView(
                 prompt: "What hurt you most?",
                 options: viewModel.availableProblems,
@@ -92,7 +122,25 @@ struct DebriefFlowView: View {
                 maxSelections: 2
             ) { viewModel.toggleProblem($0) }
 
-        case 4:
+        case .whatWorked:
+            DebriefQuestionView(
+                prompt: "What worked well?",
+                options: WhatWorked.allCases,
+                icon: \.icon,
+                selection: setFrom(viewModel.selectedWhatWorked)
+            ) { viewModel.selectAndAdvance($0, binding: \.selectedWhatWorked) }
+
+        case .improvementAreas:
+            DebriefQuestionView(
+                prompt: "What could have been cleaner?",
+                options: ImprovementArea.allCases,
+                icon: \.icon,
+                selection: viewModel.selectedImprovementAreas,
+                multiSelect: true,
+                maxSelections: 2
+            ) { viewModel.toggleImprovementArea($0) }
+
+        case .pattern:
             DebriefQuestionView(
                 prompt: "What happened most points?",
                 options: MatchPattern.allCases,
@@ -100,7 +148,7 @@ struct DebriefFlowView: View {
                 selection: setFrom(viewModel.selectedPattern)
             ) { viewModel.selectAndAdvance($0, binding: \.selectedPattern) }
 
-        case 5:
+        case .opponentLevel:
             DebriefQuestionView(
                 prompt: "How did they compare to you?",
                 options: OpponentLevel.allCases,
@@ -108,14 +156,11 @@ struct DebriefFlowView: View {
                 selection: setFrom(viewModel.selectedOpponentLevel)
             ) { viewModel.selectAndAdvance($0, binding: \.selectedOpponentLevel) }
 
-        case 6:
+        case .context:
             DebriefContextView(
                 selectedContexts: $viewModel.selectedContexts,
                 contextNote: $viewModel.contextNote
             )
-
-        default:
-            EmptyView()
         }
     }
 
@@ -204,9 +249,25 @@ struct DebriefFlowView: View {
         guard let value else { return [] }
         return [value]
     }
+
+    /// Opponents sorted by most recent match first
+    private var sortedOpponents: [Opponent] {
+        let matchDates: [UUID: Date] = Dictionary(
+            allMatches.flatMap { match in
+                match.opponentIds.map { ($0, match.date) }
+            },
+            uniquingKeysWith: { a, b in max(a, b) }
+        )
+
+        return allOpponents.sorted { a, b in
+            let dateA = matchDates[a.id] ?? a.createdAt
+            let dateB = matchDates[b.id] ?? b.createdAt
+            return dateA > dateB
+        }
+    }
 }
 
 #Preview {
     DebriefFlowView()
-        .modelContainer(for: Match.self, inMemory: true)
+        .modelContainer(for: [Match.self, Opponent.self], inMemory: true)
 }

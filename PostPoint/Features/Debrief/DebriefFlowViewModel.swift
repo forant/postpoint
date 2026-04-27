@@ -1,39 +1,86 @@
 import Foundation
 import SwiftData
+import Mixpanel
 
 @Observable
 final class DebriefFlowViewModel {
     // MARK: - Flow State
 
-    /// Steps: 0=Result, 1=Score, 2=Format, 3=BiggestProblems, 4=Pattern, 5=OpponentLevel, 6=Context
+    /// Steps: 0=Result, 1=Score, 2=Format, 3=Opponent(s), then outcome-dependent:
+    /// Loss: 4=BiggestProblems, 5=Pattern, 6=OpponentLevel, 7=Context
+    /// Win:  4=WhatWorked, 5=ImprovementAreas, 6=Pattern, 7=OpponentLevel, 8=Context
     var currentStep = 0
-    let totalSteps = 7
 
     // Answers
     var selectedResult: MatchResult?
     var scoreLines: [ScoreLine] = [ScoreLine()]
     var selectedFormat: MatchFormat?
+    var opponentName: String = ""
+    var selectedOpponentId: UUID?
+    var secondOpponentName: String = ""
+    var secondSelectedOpponentId: UUID?
     var selectedProblems: Set<BiggestProblem> = []
     var selectedPattern: MatchPattern?
     var selectedOpponentLevel: OpponentLevel?
     var selectedContexts: Set<NotableContext> = []
     var contextNote: String = ""
+    // Win-path answers
+    var selectedWhatWorked: WhatWorked?
+    var selectedImprovementAreas: Set<ImprovementArea> = []
 
     // Completion state
     var isGenerating = false
     var debriefResult: DebriefResult?
     var error: String?
 
+    /// Set by the view before generation so history can be gathered
+    var allMatches: [Match] = []
+
     private let debriefService = DebriefService()
+    private var generationStartTime: Date?
+
+    // MARK: - Outcome Helpers
+
+    var isWin: Bool {
+        selectedResult == .wonComfortably || selectedResult == .wonClose
+    }
+
+    var isDoubles: Bool {
+        selectedFormat == .doubles || selectedFormat == .mixed
+    }
+
+    var totalSteps: Int { isWin ? 9 : 8 }
+
+    /// Maps the current step index to a semantic step identity
+    enum StepKind {
+        case result, score, format, opponent
+        case biggestProblems          // loss only
+        case whatWorked, improvementAreas  // win only
+        case pattern, opponentLevel, context
+    }
+
+    var currentStepKind: StepKind {
+        switch currentStep {
+        case 0: return .result
+        case 1: return .score
+        case 2: return .format
+        case 3: return .opponent
+        case 4: return isWin ? .whatWorked : .biggestProblems
+        case 5: return isWin ? .improvementAreas : .pattern
+        case 6: return isWin ? .pattern : .opponentLevel
+        case 7: return isWin ? .opponentLevel : .context
+        case 8: return .context  // win path only
+        default: return .result
+        }
+    }
 
     // MARK: - Step Classification
 
     /// Steps that auto-advance on selection (single-select, no text input)
     var isAutoAdvanceStep: Bool {
-        switch currentStep {
-        case 0, 2, 4, 5: return true  // Result, Format, Pattern, OpponentLevel
-        case 1, 3, 6: return false     // Score, BiggestProblems, Context
-        default: return false
+        switch currentStepKind {
+        case .result, .format, .whatWorked, .pattern, .opponentLevel: return true
+        case .opponent, .score, .biggestProblems, .improvementAreas, .context: return false
         }
     }
 
@@ -41,15 +88,17 @@ final class DebriefFlowViewModel {
     var showsContinueButton: Bool { !isAutoAdvanceStep }
 
     var canContinue: Bool {
-        switch currentStep {
-        case 0: return selectedResult != nil
-        case 1: return true  // Score is optional
-        case 2: return selectedFormat != nil
-        case 3: return !selectedProblems.isEmpty && selectedProblems.count <= 2
-        case 4: return selectedPattern != nil
-        case 5: return selectedOpponentLevel != nil
-        case 6: return true  // Context is optional
-        default: return false
+        switch currentStepKind {
+        case .result: return selectedResult != nil
+        case .score: return true
+        case .format: return selectedFormat != nil
+        case .opponent: return true  // Opponent is optional
+        case .biggestProblems: return !selectedProblems.isEmpty && selectedProblems.count <= 2
+        case .whatWorked: return selectedWhatWorked != nil
+        case .improvementAreas: return !selectedImprovementAreas.isEmpty && selectedImprovementAreas.count <= 2
+        case .pattern: return selectedPattern != nil
+        case .opponentLevel: return selectedOpponentLevel != nil
+        case .context: return true
         }
     }
 
@@ -78,8 +127,11 @@ final class DebriefFlowViewModel {
 
     func goNext() {
         guard canContinue else { return }
+
+        trackQuestionAnswered()
+
         if isLastStep {
-            generateDebrief()
+            generateDebrief(allMatches: allMatches)
         } else {
             currentStep += 1
         }
@@ -104,34 +156,126 @@ final class DebriefFlowViewModel {
         }
     }
 
+    func toggleImprovementArea(_ area: ImprovementArea) {
+        if selectedImprovementAreas.contains(area) {
+            selectedImprovementAreas.remove(area)
+        } else if selectedImprovementAreas.count < 2 {
+            selectedImprovementAreas.insert(area)
+        }
+    }
+
+    // MARK: - Opponent Helpers
+
+    /// Collected opponent names for prompt context
+    var opponentNames: [String] {
+        var names: [String] = []
+        let first = opponentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !first.isEmpty { names.append(first) }
+        if isDoubles {
+            let second = secondOpponentName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !second.isEmpty { names.append(second) }
+        }
+        return names
+    }
+
+    /// Resolved opponent IDs (only those already selected from existing opponents)
+    var resolvedOpponentIds: [UUID] {
+        var ids: [UUID] = []
+        if let id = selectedOpponentId { ids.append(id) }
+        if isDoubles, let id = secondSelectedOpponentId { ids.append(id) }
+        return ids
+    }
+
     // MARK: - Score Helpers
 
     private var enteredScoreLines: [ScoreLine] {
         scoreLines.filter { $0.hasScore }
     }
 
+    // MARK: - Opponent History
+
+    /// Summary built at generation time, stored for UI display
+    var opponentHistorySummary: OpponentHistoryService.OpponentHistorySummary?
+
     // MARK: - Debrief Generation
 
-    func generateDebrief() {
+    func generateDebrief(allMatches: [Match] = []) {
         guard let input = buildInput() else { return }
         isGenerating = true
         error = nil
+        generationStartTime = Date()
+
+        AnalyticsService.track(.debriefSubmitted, properties: analyticsProperties)
+
+        // Gather opponent history
+        let resolvedIds = resolvedOpponentIds
+        let summary = OpponentHistoryService.buildSummary(
+            opponentIds: resolvedIds,
+            opponentNames: opponentNames,
+            allMatches: allMatches,
+            isDoubles: isDoubles
+        )
+        opponentHistorySummary = summary
+
+        let profile = PlayerProfile.load()
+
+        #if DEBUG
+        if let profile {
+            print("[Debrief] PlayerProfile included: ratingType=\(profile.rating.ratingType.rawValue), skillBand=\(profile.rating.skillBand.rawValue), focusAreas=\(profile.focusAreas.count), hasBiggestStruggle=\(profile.biggestStruggle != nil)")
+        } else {
+            print("[Debrief] No PlayerProfile found — generating without profile context.")
+        }
+        #endif
 
         Task { @MainActor in
             do {
-                let result = try await debriefService.generateDebrief(from: input)
+                let result = try await debriefService.generateDebrief(
+                    from: input,
+                    opponentHistory: summary.text,
+                    playerProfile: profile
+                )
                 self.debriefResult = result
+
+                var props = analyticsProperties
+                if let start = generationStartTime {
+                    props["generation_duration_ms"] = Int(Date().timeIntervalSince(start) * 1000)
+                }
+                props["has_opponent_history"] = summary.hasHistory
+                props["has_player_profile"] = profile != nil
+                props["prompt_version"] = "player-profile-v1"
+                if let profile {
+                    props["rating_type"] = profile.rating.ratingType.rawValue
+                    props["focus_area_count"] = profile.focusAreas.count
+                    props["has_biggest_struggle"] = profile.biggestStruggle != nil
+                }
+                AnalyticsService.track(.debriefGenerated, properties: props)
+                AnalyticsService.track(.debriefViewed, properties: props)
+
+                // insight_moment_reached
+                let debriefCount = allMatches.filter { $0.debriefResult != nil }.count + 1
+                AnalyticsService.track(.insightMomentReached, properties: [
+                    "completed_match_count": allMatches.count + 1,
+                    "completed_debrief_count": debriefCount,
+                    "sport": "tennis",
+                    "match_format": input.matchFormat.rawValue,
+                ])
             } catch let debriefError as DebriefError {
                 self.error = debriefError.errorDescription
+                var props = analyticsProperties
+                props["error_type"] = debriefError.errorDescription ?? "unknown"
+                AnalyticsService.track(.debriefGenerationFailed, properties: props)
             } catch {
                 self.error = "Something went wrong. Please try again."
+                var props = analyticsProperties
+                props["error_type"] = "unknown"
+                AnalyticsService.track(.debriefGenerationFailed, properties: props)
             }
             self.isGenerating = false
         }
     }
 
     func retry() {
-        generateDebrief()
+        generateDebrief(allMatches: allMatches)
     }
 
     func buildInput() -> DebriefInput? {
@@ -139,9 +283,15 @@ final class DebriefFlowViewModel {
             let result = selectedResult,
             let format = selectedFormat,
             let pattern = selectedPattern,
-            let level = selectedOpponentLevel,
-            !selectedProblems.isEmpty
+            let level = selectedOpponentLevel
         else { return nil }
+
+        // Validate path-specific requirements
+        if isWin {
+            guard selectedWhatWorked != nil, !selectedImprovementAreas.isEmpty else { return nil }
+        } else {
+            guard !selectedProblems.isEmpty else { return nil }
+        }
 
         let trimmedNote = contextNote.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -149,27 +299,121 @@ final class DebriefFlowViewModel {
             result: result,
             scoreLines: enteredScoreLines,
             matchFormat: format,
-            biggestProblems: Array(selectedProblems),
+            biggestProblems: isWin ? [] : Array(selectedProblems),
             matchPattern: pattern,
             opponentLevel: level,
             notableContexts: Array(selectedContexts),
-            contextNote: trimmedNote.isEmpty ? nil : trimmedNote
+            contextNote: trimmedNote.isEmpty ? nil : trimmedNote,
+            whatWorked: isWin ? selectedWhatWorked : nil,
+            improvementAreas: isWin ? Array(selectedImprovementAreas) : nil,
+            sport: .tennis,
+            scoringSystem: .tennisSets,
+            schemaVersion: 1,
+            opponentNames: opponentNames
         )
     }
 
-    /// Saves the completed debrief as a new Match in SwiftData
-    func saveMatch(to modelContext: ModelContext, sport: Sport) {
+    /// Saves the completed debrief as a new Match in SwiftData.
+    /// Resolves opponents: reuses existing by ID or normalized name, or creates new.
+    func saveMatch(to modelContext: ModelContext) {
         guard let input = buildInput(), let result = debriefResult else { return }
+
+        var resolvedIds: [UUID] = []
+        var snapshots: [String] = []
+
+        // Resolve primary opponent
+        resolveOpponent(
+            name: opponentName,
+            selectedId: selectedOpponentId,
+            into: &resolvedIds,
+            snapshots: &snapshots,
+            context: modelContext
+        )
+
+        // Resolve second opponent (doubles)
+        if isDoubles {
+            resolveOpponent(
+                name: secondOpponentName,
+                selectedId: secondSelectedOpponentId,
+                into: &resolvedIds,
+                snapshots: &snapshots,
+                context: modelContext
+            )
+        }
 
         let scoreNote = input.scoreDisplay.map { " (\($0))" } ?? ""
         let match = Match(
-            opponentName: "Opponent",
-            sport: sport,
+            opponentName: snapshots.joined(separator: " & "),
+            sport: .tennis,
             notes: "\(input.result.rawValue)\(scoreNote) \u{2022} \(input.matchPattern.rawValue)",
+            matchFormat: input.matchFormat,
+            scoringSystem: .tennisSets,
+            opponentIds: resolvedIds,
+            opponentNameSnapshots: snapshots,
             debriefInput: input,
-            debriefResult: result
+            debriefResult: result,
+            ownerUserId: UserIdentityService.shared.anonymousUserId
         )
 
         modelContext.insert(match)
+
+        // Track match saved
+        AnalyticsService.track(.matchSaved, properties: [
+            "sport": "tennis",
+            "match_format": input.matchFormat.rawValue,
+            "scoring_system": ScoringSystem.tennisSets.rawValue,
+            "opponent_count": resolvedIds.count,
+            "has_score": input.scoreDisplay != nil,
+            "result": input.result.rawValue,
+            "score_set_count": enteredScoreLines.count,
+        ])
+    }
+
+    private func resolveOpponent(
+        name: String,
+        selectedId: UUID?,
+        into ids: inout [UUID],
+        snapshots: inout [String],
+        context: ModelContext
+    ) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        if let existingId = selectedId {
+            ids.append(existingId)
+            snapshots.append(trimmed)
+        } else {
+            let opponent = Opponent.findOrCreate(displayName: trimmed, in: context)
+            ids.append(opponent.id)
+            snapshots.append(opponent.displayName)
+        }
+    }
+
+    // MARK: - Analytics
+
+    /// Common properties for debrief funnel events
+    var analyticsProperties: [String: MixpanelType] {
+        var props: [String: MixpanelType] = [
+            "sport": "tennis",
+            "question_count": totalSteps,
+            "schema_version": 1,
+            "prompt_version": "opponent-context-v1",
+        ]
+        if let format = selectedFormat {
+            props["match_format"] = format.rawValue
+        }
+        if let result = selectedResult {
+            props["result"] = result.rawValue
+        }
+        props["opponent_count"] = opponentNames.count
+        return props
+    }
+
+    private func trackQuestionAnswered() {
+        var props = analyticsProperties
+        props["step"] = currentStep
+        props["step_kind"] = String(describing: currentStepKind)
+        props["answered_question_count"] = currentStep + 1
+        AnalyticsService.track(.debriefQuestionAnswered, properties: props)
     }
 }
