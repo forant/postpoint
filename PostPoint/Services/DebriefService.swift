@@ -1,53 +1,99 @@
 import Foundation
 
-/// Generates post-match debrief analysis.
-/// Currently returns mocked results; will be replaced with AI API call.
+/// Generates post-match debrief analysis via the PostPoint backend, with mock fallback.
 struct DebriefService {
 
-    // MARK: - Future AI Prompt
-
-    /// System prompt for future AI integration:
-    ///
-    /// "You are a highly perceptive tennis and pickleball coach.
-    /// Your job is to analyze a player's match using limited inputs and produce a sharp, specific, and actionable debrief.
-    ///
-    /// Rules:
-    /// - Be concise but insightful
-    /// - Avoid generic advice
-    /// - Identify ONE primary issue that likely caused the result
-    /// - Explain WHY it mattered in the context of the match
-    /// - Give ONE clear adjustment for the next match
-    /// - If relevant, include a specific tactical suggestion
-    ///
-    /// Tone:
-    /// - Direct, slightly opinionated, but constructive
-    /// - Sound like a smart coach, not a motivational speaker
-    ///
-    /// Do NOT list multiple tips. Focus on the highest-leverage insight."
-    ///
-    /// User prompt template:
-    /// "Match result: {{result}}
-    /// Format: {{format}}
-    /// Biggest issue: {{issue}}
-    /// Match pattern: {{pattern}}
-    /// Opponent level: {{opponent_level}}
-    ///
-    /// Generate a short post-match debrief."
+    // MARK: - Public API
 
     func generateDebrief(from input: DebriefInput) async throws -> DebriefResult {
-        // Simulate network/AI latency
-        try await Task.sleep(for: .seconds(1.5))
-
-        return mockDebrief(for: input)
+        do {
+            return try await callBackend(input: input)
+        } catch {
+            // If the backend is unreachable (e.g. localhost during dev), fall back to mock
+            if isConnectionError(error) && APIConfig.baseURL.contains("localhost") {
+                return try await mockDebrief(for: input)
+            }
+            throw error
+        }
     }
 
-    // MARK: - Mock Generation
+    // MARK: - Backend Call
 
-    private func mockDebrief(for input: DebriefInput) -> DebriefResult {
+    private func callBackend(input: DebriefInput) async throws -> DebriefResult {
+        var request = URLRequest(url: APIConfig.debriefURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 30
+
+        let body = DebriefRequest(
+            result: input.result.rawValue,
+            score: input.scoreDisplay,
+            matchFormat: input.matchFormat.rawValue,
+            biggestProblems: input.biggestProblems.map(\.rawValue),
+            matchPattern: input.matchPattern.rawValue,
+            opponentLevel: input.opponentLevel.rawValue,
+            context: buildContextString(from: input)
+        )
+
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DebriefError.networkFailure
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            // Try to extract error detail from backend
+            if let errorBody = try? JSONDecoder().decode(BackendError.self, from: data) {
+                throw DebriefError.backendError(errorBody.detail)
+            }
+            throw DebriefError.networkFailure
+        }
+
+        let result = try JSONDecoder().decode(DebriefResponse.self, from: data)
+
+        return DebriefResult(
+            primaryIssue: result.primaryIssue,
+            explanation: result.explanation,
+            nextMatchAdjustment: result.nextMatchAdjustment
+        )
+    }
+
+    // MARK: - Context Formatting
+
+    private func buildContextString(from input: DebriefInput) -> String? {
+        var parts: [String] = input.notableContexts.map(\.rawValue)
+
+        if let note = input.contextNote, !note.isEmpty {
+            parts.append(note)
+        }
+
+        return parts.isEmpty ? nil : parts.joined(separator: "; ")
+    }
+
+    // MARK: - Helpers
+
+    private func isConnectionError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && [
+            NSURLErrorCannotConnectToHost,
+            NSURLErrorNetworkConnectionLost,
+            NSURLErrorNotConnectedToInternet,
+            NSURLErrorTimedOut,
+            NSURLErrorCannotFindHost,
+        ].contains(nsError.code)
+    }
+
+    // MARK: - Mock Fallback
+
+    private func mockDebrief(for input: DebriefInput) async throws -> DebriefResult {
+        try await Task.sleep(for: .seconds(1.5))
+
         let primary = input.biggestProblems.first ?? .unforcedErrors
         let isLoss = input.result == .lostClose || input.result == .lostBadly
 
-        let (issue, explanation, adjustment) = debriefContent(
+        var (issue, explanation, adjustment) = debriefContent(
             problem: primary,
             result: input.result,
             pattern: input.matchPattern,
@@ -56,11 +102,45 @@ struct DebriefService {
             isLoss: isLoss
         )
 
+        if let contextAddition = contextNuance(for: input) {
+            explanation += " " + contextAddition
+        }
+
         return DebriefResult(
             primaryIssue: issue,
             explanation: explanation,
             nextMatchAdjustment: adjustment
         )
+    }
+
+    private func contextNuance(for input: DebriefInput) -> String? {
+        guard input.hasContext else { return nil }
+
+        let contexts = input.notableContexts
+        if contexts.contains(.fatigued) || contexts.contains(.sleptPoorly) {
+            return "Low energy likely played a role\u{2014}fatigue erodes decision-making before it erodes technique. But that's context, not an excuse."
+        }
+        if contexts.contains(.stressedOut) {
+            return "Coming in stressed or distracted makes it harder to stay present. Your off-court state bled into your on-court play."
+        }
+        if contexts.contains(.rusty) {
+            return "Ring rust is real\u{2014}timing and instincts take a few matches to sharpen. The fact that you played is what matters most right now."
+        }
+        if contexts.contains(.newEquipment) {
+            return "New equipment changes feel and timing. Give yourself 2\u{2013}3 sessions before judging your game with it."
+        }
+        if contexts.contains(.toughConditions) {
+            return "Tough conditions affect everyone\u{2014}the question is who adapts faster. Factor that into your shot selection next time."
+        }
+        if contexts.contains(.sick) {
+            return "Playing while sick limits your physical ceiling. Credit yourself for competing, but don't read too much into the result."
+        }
+
+        if let note = input.contextNote, !note.isEmpty {
+            return "Your noted context (\"\(note)\") may have been a factor worth tracking over time."
+        }
+
+        return nil
     }
 
     private func debriefContent(
@@ -90,13 +170,31 @@ struct DebriefService {
                 "Pick one high-error shot and commit to hitting it at 80% power next match. Consistency beats power."
             )
 
-        case .weakServeReturn:
+        case .weakFirstServe:
             return (
-                "Serve and return let you down",
+                "First serve wasn't a weapon",
                 isLoss
-                    ? "When the serve and return aren't working, you start every point on the back foot. Against a \(opponentLevel.rawValue.lowercased()) opponent, that's a hole you can't climb out of repeatedly."
-                    : "You found a way to win despite a shaky serve and return game. But you're leaving easy points on the table at the start of every rally.",
-                "Simplify your service motion. Focus on placement over power\u{2014}hit 70% of first serves in and pick a return target before the ball is struck."
+                    ? "A weak first serve means you're playing second-serve tennis most of the match. Against a \(opponentLevel.rawValue.lowercased()) opponent, that hands them the initiative from the start of every point."
+                    : "You won despite a shaky first serve, but you're leaving free points on the table. A reliable first serve changes the entire dynamic of a match.",
+                "Focus on placement over power\u{2014}aim for 65%+ first serves in. Pick one spot and commit to it before you toss."
+            )
+
+        case .weakSecondServe:
+            return (
+                "Second serve was a liability",
+                isLoss
+                    ? "When your second serve is attackable, your opponent starts every point on offense. Against a \(opponentLevel.rawValue.lowercased()) player, a weak second serve is an invitation to dominate the rally."
+                    : "You won, but your second serve was a gift. Better opponents will punish it ruthlessly.",
+                "Add more spin and depth to your second serve. A second serve that lands deep and kicks is worth more than a first serve that misses."
+            )
+
+        case .weakServiceReturn:
+            return (
+                "Return game broke down",
+                isLoss
+                    ? "If you can't neutralize the serve, you're fighting uphill on every return game. Against a \(opponentLevel.rawValue.lowercased()) opponent, that pressure compounds fast."
+                    : "You pulled through despite a shaky return game. But you made their service games too easy\u{2014}they held without sweating.",
+                "Pick a return target before the serve is hit. Just getting the ball back deep and crosscourt changes the point dynamics."
             )
 
         case .couldntFinishPoints:
@@ -144,6 +242,47 @@ struct DebriefService {
                     : "You won, but not because of your partnership\u{2014}despite it. Better opponents will exploit the gaps between you and your partner.",
                 "Before next match, agree on three things with your partner: who takes middle balls, how you signal switches, and one formation you'll default to under pressure."
             )
+        }
+    }
+}
+
+// MARK: - Request/Response DTOs
+
+private struct DebriefRequest: Encodable {
+    let result: String
+    let score: String?
+    let matchFormat: String
+    let biggestProblems: [String]
+    let matchPattern: String
+    let opponentLevel: String
+    let context: String?
+}
+
+private struct DebriefResponse: Decodable {
+    let primaryIssue: String
+    let explanation: String
+    let nextMatchAdjustment: String
+}
+
+private struct BackendError: Decodable {
+    let detail: String
+}
+
+// MARK: - Errors
+
+enum DebriefError: LocalizedError {
+    case networkFailure
+    case backendError(String)
+    case invalidResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .networkFailure:
+            return "Network error. Check your connection and try again."
+        case .backendError(let detail):
+            return detail
+        case .invalidResponse:
+            return "Couldn't parse the response. Try again."
         }
     }
 }

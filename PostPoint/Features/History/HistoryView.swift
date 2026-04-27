@@ -16,9 +16,16 @@ struct HistoryView: View {
                     )
                 } else {
                     List(viewModel.filteredMatches(matches)) { match in
-                        MatchRowView(match: match)
+                        NavigationLink(value: match.id) {
+                            MatchRowView(match: match)
+                        }
                     }
                     .searchable(text: $viewModel.searchText, prompt: "Search matches")
+                    .navigationDestination(for: UUID.self) { matchID in
+                        if let match = matches.first(where: { $0.id == matchID }) {
+                            MatchDetailView(match: match)
+                        }
+                    }
                 }
             }
             .navigationTitle("History")

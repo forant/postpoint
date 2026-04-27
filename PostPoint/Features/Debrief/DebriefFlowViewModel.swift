@@ -5,9 +5,9 @@ import SwiftData
 final class DebriefFlowViewModel {
     // MARK: - Flow State
 
-    /// Steps: 0=Result, 1=Score, 2=Format, 3=BiggestProblems, 4=Pattern, 5=OpponentLevel
+    /// Steps: 0=Result, 1=Score, 2=Format, 3=BiggestProblems, 4=Pattern, 5=OpponentLevel, 6=Context
     var currentStep = 0
-    let totalSteps = 6
+    let totalSteps = 7
 
     // Answers
     var selectedResult: MatchResult?
@@ -16,6 +16,8 @@ final class DebriefFlowViewModel {
     var selectedProblems: Set<BiggestProblem> = []
     var selectedPattern: MatchPattern?
     var selectedOpponentLevel: OpponentLevel?
+    var selectedContexts: Set<NotableContext> = []
+    var contextNote: String = ""
 
     // Completion state
     var isGenerating = false
@@ -30,7 +32,7 @@ final class DebriefFlowViewModel {
     var isAutoAdvanceStep: Bool {
         switch currentStep {
         case 0, 2, 4, 5: return true  // Result, Format, Pattern, OpponentLevel
-        case 1, 3: return false        // Score (builder), BiggestProblems (multi-select)
+        case 1, 3, 6: return false     // Score, BiggestProblems, Context
         default: return false
         }
     }
@@ -46,6 +48,7 @@ final class DebriefFlowViewModel {
         case 3: return !selectedProblems.isEmpty && selectedProblems.count <= 2
         case 4: return selectedPattern != nil
         case 5: return selectedOpponentLevel != nil
+        case 6: return true  // Context is optional
         default: return false
         }
     }
@@ -85,7 +88,6 @@ final class DebriefFlowViewModel {
     /// Called by single-select questions to set value and auto-advance
     func selectAndAdvance<T: Equatable>(_ value: T, binding: ReferenceWritableKeyPath<DebriefFlowViewModel, T?>) {
         self[keyPath: binding] = value
-        // Small delay so the user sees their selection highlight
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(250))
             self.goNext()
@@ -104,14 +106,13 @@ final class DebriefFlowViewModel {
 
     // MARK: - Score Helpers
 
-    /// Only keep score lines that have actual scores entered
     private var enteredScoreLines: [ScoreLine] {
         scoreLines.filter { $0.hasScore }
     }
 
     // MARK: - Debrief Generation
 
-    private func generateDebrief() {
+    func generateDebrief() {
         guard let input = buildInput() else { return }
         isGenerating = true
         error = nil
@@ -120,11 +121,17 @@ final class DebriefFlowViewModel {
             do {
                 let result = try await debriefService.generateDebrief(from: input)
                 self.debriefResult = result
+            } catch let debriefError as DebriefError {
+                self.error = debriefError.errorDescription
             } catch {
-                self.error = "Failed to generate debrief. Please try again."
+                self.error = "Something went wrong. Please try again."
             }
             self.isGenerating = false
         }
+    }
+
+    func retry() {
+        generateDebrief()
     }
 
     func buildInput() -> DebriefInput? {
@@ -136,13 +143,17 @@ final class DebriefFlowViewModel {
             !selectedProblems.isEmpty
         else { return nil }
 
+        let trimmedNote = contextNote.trimmingCharacters(in: .whitespacesAndNewlines)
+
         return DebriefInput(
             result: result,
             scoreLines: enteredScoreLines,
             matchFormat: format,
             biggestProblems: Array(selectedProblems),
             matchPattern: pattern,
-            opponentLevel: level
+            opponentLevel: level,
+            notableContexts: Array(selectedContexts),
+            contextNote: trimmedNote.isEmpty ? nil : trimmedNote
         )
     }
 

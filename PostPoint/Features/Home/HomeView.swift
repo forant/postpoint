@@ -17,6 +17,11 @@ struct HomeView: View {
                 .padding(.top, AppSpacing.md)
             }
             .navigationTitle("PostPoint")
+            .navigationDestination(for: UUID.self) { matchID in
+                if let match = matches.first(where: { $0.id == matchID }) {
+                    MatchDetailView(match: match)
+                }
+            }
             .fullScreenCover(isPresented: $viewModel.showingDebrief) {
                 DebriefFlowView()
             }
@@ -44,7 +49,10 @@ struct HomeView: View {
             } else {
                 LazyVStack(spacing: AppSpacing.sm) {
                     ForEach(viewModel.recentMatches(matches)) { match in
-                        MatchRowView(match: match)
+                        NavigationLink(value: match.id) {
+                            MatchRowView(match: match)
+                        }
+                        .buttonStyle(.plain)
                         if match.id != viewModel.recentMatches(matches).last?.id {
                             Divider()
                         }

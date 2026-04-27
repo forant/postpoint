@@ -11,6 +11,8 @@ struct DebriefFlowView: View {
             Group {
                 if viewModel.isGenerating {
                     generatingView
+                } else if let error = viewModel.error {
+                    errorView(error)
                 } else if let result = viewModel.debriefResult {
                     DebriefSummaryView(result: result) {
                         viewModel.saveMatch(to: modelContext, sport: .tennis)
@@ -34,7 +36,6 @@ struct DebriefFlowView: View {
 
     private var questionFlow: some View {
         VStack(spacing: 0) {
-            // Progress bar
             ProgressView(value: viewModel.progress)
                 .tint(AppColors.primary)
                 .padding(.horizontal, AppSpacing.md)
@@ -44,14 +45,12 @@ struct DebriefFlowView: View {
                 .foregroundStyle(AppColors.secondaryLabel)
                 .padding(.top, AppSpacing.sm)
 
-            // Question content
             ScrollView {
                 currentQuestion
                     .padding(.horizontal, AppSpacing.md)
                     .padding(.top, AppSpacing.lg)
             }
 
-            // Navigation bar
             navigationBar
         }
     }
@@ -108,6 +107,12 @@ struct DebriefFlowView: View {
                 icon: \.icon,
                 selection: setFrom(viewModel.selectedOpponentLevel)
             ) { viewModel.selectAndAdvance($0, binding: \.selectedOpponentLevel) }
+
+        case 6:
+            DebriefContextView(
+                selectedContexts: $viewModel.selectedContexts,
+                contextNote: $viewModel.contextNote
+            )
 
         default:
             EmptyView()
@@ -168,6 +173,27 @@ struct DebriefFlowView: View {
             Text("Analyzing your match...")
                 .font(AppFont.headline())
                 .foregroundStyle(AppColors.secondaryLabel)
+            Spacer()
+        }
+    }
+
+    // MARK: - Error State
+
+    private func errorView(_ message: String) -> some View {
+        VStack(spacing: AppSpacing.lg) {
+            Spacer()
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40))
+                .foregroundStyle(AppColors.secondaryLabel)
+            Text(message)
+                .font(AppFont.body())
+                .foregroundStyle(AppColors.secondaryLabel)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, AppSpacing.lg)
+            PrimaryButton("Try Again", icon: "arrow.clockwise") {
+                viewModel.retry()
+            }
+            .padding(.horizontal, AppSpacing.lg)
             Spacer()
         }
     }

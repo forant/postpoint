@@ -42,7 +42,9 @@ enum MatchFormat: String, Codable, CaseIterable, Identifiable {
 
 enum BiggestProblem: String, Codable, CaseIterable, Identifiable {
     case unforcedErrors = "Unforced errors"
-    case weakServeReturn = "Weak serve/return"
+    case weakFirstServe = "Weak first serve"
+    case weakSecondServe = "Weak second serve"
+    case weakServiceReturn = "Weak service return"
     case couldntFinishPoints = "Couldn't finish points"
     case positioningMovement = "Positioning / movement"
     case targetedByOpponents = "Targeted by opponents"
@@ -54,7 +56,9 @@ enum BiggestProblem: String, Codable, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .unforcedErrors: return "xmark.circle"
-        case .weakServeReturn: return "arrow.up.right"
+        case .weakFirstServe: return "1.circle"
+        case .weakSecondServe: return "2.circle"
+        case .weakServiceReturn: return "arrow.uturn.left"
         case .couldntFinishPoints: return "flag.slash"
         case .positioningMovement: return "figure.walk"
         case .targetedByOpponents: return "target"
@@ -82,6 +86,32 @@ enum MatchPattern: String, Codable, CaseIterable, Identifiable {
         case .defending: return "shield.fill"
         case .attackingButMissing: return "scope"
         case .backAndForthAtNet: return "arrow.up.and.down"
+        }
+    }
+}
+
+// MARK: - Notable Context (optional, select 0-2)
+
+enum NotableContext: String, Codable, CaseIterable, Identifiable {
+    case sleptPoorly = "Slept poorly last night"
+    case sick = "Sick"
+    case stressedOut = "Stressed out"
+    case newEquipment = "New equipment"
+    case toughConditions = "Windy / tough conditions"
+    case fatigued = "Fatigued / low energy"
+    case rusty = "Rusty / haven't played recently"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .sleptPoorly: return "moon.zzz.fill"
+        case .sick: return "facemask.fill"
+        case .stressedOut: return "brain"
+        case .newEquipment: return "wrench.and.screwdriver"
+        case .toughConditions: return "wind"
+        case .fatigued: return "battery.25percent"
+        case .rusty: return "clock.arrow.circlepath"
         }
     }
 }

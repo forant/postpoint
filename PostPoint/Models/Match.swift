@@ -71,7 +71,9 @@ extension Match {
                     matchFormat: .singles,
                     biggestProblems: [.unforcedErrors],
                     matchPattern: .longRallies,
-                    opponentLevel: .sameLevel
+                    opponentLevel: .sameLevel,
+                    notableContexts: [.fatigued],
+                    contextNote: nil
                 ),
                 debriefResult: DebriefResult(
                     primaryIssue: "Unforced errors in neutral rallies",
