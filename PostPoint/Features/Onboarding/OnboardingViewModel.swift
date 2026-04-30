@@ -5,7 +5,7 @@ final class OnboardingViewModel {
     // MARK: - Flow State
 
     var currentStep = 0
-    let totalSteps = 5
+    let totalSteps = 6
 
     // Step 1: Name
     var firstName: String = ""
@@ -24,6 +24,9 @@ final class OnboardingViewModel {
     // Step 5: Biggest struggle (free text, optional)
     var biggestStruggleText: String = ""
 
+    // Step 6: Next match (optional, does not block completion)
+    var nextMatchHandled = false
+
     // Completion
     var isComplete = false
 
@@ -40,6 +43,7 @@ final class OnboardingViewModel {
         case 2: return ratingInputValid
         case 3: return !selectedFocusAreas.isEmpty && selectedFocusAreas.count <= 3
         case 4: return true  // optional free text
+        case 5: return true  // next match is optional
         default: return false
         }
     }
@@ -78,8 +82,18 @@ final class OnboardingViewModel {
         if isLastStep {
             completeOnboarding()
         } else {
+            // Save profile after biggest struggle step (before optional next match step)
+            if currentStep == 4 {
+                saveProfile()
+            }
             currentStep += 1
         }
+    }
+
+    /// Called from the next match prompt when the user finishes (set or skipped)
+    func handleNextMatchDone() {
+        nextMatchHandled = true
+        completeOnboarding()
     }
 
     func selectAndAdvanceRatingType(_ type: RatingType) {
@@ -101,11 +115,9 @@ final class OnboardingViewModel {
         }
     }
 
-    // MARK: - Completion
+    // MARK: - Profile Saving
 
-    private func completeOnboarding() {
-        guard canContinue else { return }
-
+    private func saveProfile() {
         let rating = PlayerRating(
             ratingType: selectedRatingType ?? .selfReported,
             utrValue: Double(utrValue),
@@ -124,12 +136,30 @@ final class OnboardingViewModel {
         )
 
         profile.save()
+    }
+
+    // MARK: - Completion
+
+    private func completeOnboarding() {
+        // Profile was already saved at step 4 -> 5 transition.
+        // If somehow we got here without saving (e.g. direct completion), save now.
+        if !PlayerProfile.hasCompletedOnboarding {
+            saveProfile()
+        }
+
+        let rating = PlayerRating(
+            ratingType: selectedRatingType ?? .selfReported,
+            utrValue: Double(utrValue),
+            ustaValue: selectedUSTALevel,
+            playerLevel: selectedPlayerLevel
+        )
 
         AnalyticsService.track(.onboardingCompleted, properties: [
             "rating_type": rating.ratingType.rawValue,
             "skill_band": rating.skillBand.rawValue,
             "focus_area_count": selectedFocusAreas.count,
-            "has_biggest_struggle": !trimmedStruggle.isEmpty,
+            "has_biggest_struggle": !biggestStruggleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            "has_next_match": NextMatch.load() != nil,
         ])
 
         isComplete = true

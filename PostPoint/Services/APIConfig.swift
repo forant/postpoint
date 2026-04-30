@@ -15,4 +15,9 @@ enum APIConfig {
     static var debriefURL: URL {
         URL(string: "\(baseURL)/debrief")!
     }
+
+    /// Full URL for the pre-match brief endpoint
+    static var preMatchBriefURL: URL {
+        URL(string: "\(baseURL)/pre-match-brief")!
+    }
 }

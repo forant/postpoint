@@ -13,6 +13,9 @@ final class Opponent {
     var phone: String?
     var externalUserId: String?
 
+    // Scouting notes (optional, added via Scout Opponent flow)
+    var scoutingNotes: OpponentScoutingNotes?
+
     init(displayName: String) {
         self.id = UUID()
         self.displayName = displayName

@@ -4,12 +4,20 @@ import SwiftData
 struct HomeView: View {
     @Query(sort: \Match.date, order: .reverse) private var matches: [Match]
     @State private var viewModel = HomeViewModel()
+    @Binding var tabSelection: Int
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: AppSpacing.lg) {
                     debriefButton
+
+                    if viewModel.shouldShowPreMatchCard {
+                        preMatchBriefCard
+                    } else {
+                        scoutOpponentTeaser
+                    }
+
                     recentMatchesSection
                     progressTeaser
                 }
@@ -17,6 +25,15 @@ struct HomeView: View {
                 .padding(.top, AppSpacing.md)
             }
             .navigationTitle("PostPoint")
+            .onAppear {
+                viewModel.loadNextMatch()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                viewModel.loadNextMatch()
+            }
+            .onChange(of: tabSelection) { _, newTab in
+                if newTab == 0 { viewModel.loadNextMatch() }
+            }
             #if DEBUG
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -42,6 +59,18 @@ struct HomeView: View {
             .fullScreenCover(isPresented: $viewModel.showingDebrief) {
                 DebriefFlowView()
             }
+            .fullScreenCover(isPresented: $viewModel.showingPreMatchBrief) {
+                PreMatchBriefView()
+            }
+            .sheet(isPresented: $viewModel.showingScoutOpponent) {
+                ScoutOpponentView()
+            }
+            .onChange(of: viewModel.showingScoutOpponent) { _, isShowing in
+                if !isShowing { viewModel.loadNextMatch() }
+            }
+            .onChange(of: viewModel.showingDebrief) { _, isShowing in
+                if !isShowing { viewModel.loadNextMatch() }
+            }
         }
     }
 
@@ -52,6 +81,78 @@ struct HomeView: View {
             viewModel.showingDebrief = true
         }
         .padding(.top, AppSpacing.sm)
+    }
+
+    // MARK: - Pre-Match Brief Card
+
+    private var preMatchBriefCard: some View {
+        Button {
+            viewModel.showingPreMatchBrief = true
+        } label: {
+            HStack(spacing: AppSpacing.md) {
+                Image(systemName: "target")
+                    .font(.title2)
+                    .foregroundStyle(AppColors.primary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if let match = viewModel.nextMatch {
+                        let isToday = Calendar.current.isDateInToday(match.scheduledDate)
+                        Text(isToday ? "Match day" : "Match tomorrow")
+                            .font(AppFont.headline())
+                            .foregroundStyle(AppColors.label)
+
+                        if let name = match.opponentName, !name.isEmpty {
+                            Text("vs \(name) · View your pre-match focus")
+                                .font(AppFont.caption())
+                                .foregroundStyle(AppColors.secondaryLabel)
+                        } else {
+                            Text("View your pre-match focus")
+                                .font(AppFont.caption())
+                                .foregroundStyle(AppColors.secondaryLabel)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.tertiaryLabel)
+            }
+            .padding(AppSpacing.md)
+            .background(AppColors.primary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Scout Opponent Teaser
+
+    private var scoutOpponentTeaser: some View {
+        Button {
+            viewModel.showingScoutOpponent = true
+        } label: {
+            HStack(spacing: AppSpacing.md) {
+                Image(systemName: "person.badge.plus")
+                    .foregroundStyle(AppColors.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Playing someone soon?")
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(AppColors.label)
+                    Text("Scout opponent & set match date")
+                        .font(AppFont.caption())
+                        .foregroundStyle(AppColors.secondaryLabel)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.tertiaryLabel)
+            }
+            .padding(AppSpacing.md)
+            .background(AppColors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Recent Matches
@@ -111,6 +212,6 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(tabSelection: .constant(0))
         .modelContainer(for: Match.self, inMemory: true)
 }

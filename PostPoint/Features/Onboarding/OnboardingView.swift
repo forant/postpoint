@@ -22,7 +22,9 @@ struct OnboardingView: View {
                         .padding(.top, AppSpacing.lg)
                 }
 
-                navigationBar
+                if viewModel.currentStep != 5 {
+                    navigationBar
+                }
             }
             .navigationTitle("Welcome")
             .navigationBarTitleDisplayMode(.inline)
@@ -52,6 +54,8 @@ struct OnboardingView: View {
             focusAreasStep
         case 4:
             biggestStruggleStep
+        case 5:
+            nextMatchStep
         default:
             EmptyView()
         }
@@ -249,6 +253,14 @@ struct OnboardingView: View {
             "Lack of focus",
             "My weak second serve",
         ]
+    }
+
+    // MARK: - Step 6: Next Match
+
+    private var nextMatchStep: some View {
+        NextMatchPromptView {
+            viewModel.handleNextMatchDone()
+        }
     }
 
     // MARK: - Navigation Bar

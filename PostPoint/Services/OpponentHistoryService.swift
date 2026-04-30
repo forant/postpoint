@@ -12,11 +12,13 @@ struct OpponentHistoryService {
     }
 
     /// Builds a history summary for the given opponent IDs against all prior matches.
+    /// Includes scouting notes when available.
     static func buildSummary(
         opponentIds: [UUID],
         opponentNames: [String],
         allMatches: [Match],
-        isDoubles: Bool
+        isDoubles: Bool,
+        opponents: [Opponent] = []
     ) -> OpponentHistorySummary {
         guard !opponentIds.isEmpty else {
             return OpponentHistorySummary(text: nil, opponentNamesWithHistory: [])
@@ -32,7 +34,15 @@ struct OpponentHistoryService {
                 .filter { $0.opponentIds.contains(opponentId) }
                 .sorted { $0.date > $1.date }
 
-            guard !priorMatches.isEmpty else { continue }
+            // If no matches but has scouting notes, still include
+            if priorMatches.isEmpty {
+                if let opponent = opponents.first(where: { $0.id == opponentId }),
+                   let scoutContext = opponent.scoutingNotes?.promptContext {
+                    sections.append("- \(name): no prior matches.\n  Scouting notes: \(scoutContext)")
+                    namesWithHistory.append(name)
+                }
+                continue
+            }
             namesWithHistory.append(name)
 
             let wins = priorMatches.filter(\.isWin).count
@@ -66,6 +76,12 @@ struct OpponentHistoryService {
             if let lastFocus = priorMatches.first(where: { $0.debriefResult != nil })?.debriefResult?.nextMatchAdjustment {
                 let truncated = String(lastFocus.prefix(150))
                 lines.append("  Last recommended focus: \(truncated)")
+            }
+
+            // Scouting notes (user-perceived, not objective)
+            if let opponent = opponents.first(where: { $0.id == opponentId }),
+               let scoutContext = opponent.scoutingNotes?.promptContext {
+                lines.append("  Scouting notes: \(scoutContext)")
             }
 
             sections.append(lines.joined(separator: "\n"))

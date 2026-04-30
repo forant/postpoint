@@ -21,6 +21,16 @@ enum AnalyticsEvent: String {
     case debriefGenerationFailed = "debrief_generation_failed"
     case debriefViewed = "debrief_viewed"
 
+    // Opponent scouting
+    case opponentScouted = "opponent_scouted"
+
+    // Next match loop
+    case nextMatchSet = "next_match_set"
+    case nextMatchSkipped = "next_match_skipped"
+    case preMatchBriefViewed = "pre_match_brief_viewed"
+    case preMatchBriefGenerated = "pre_match_brief_generated"
+    case preMatchBriefFailed = "pre_match_brief_failed"
+
     // Paywall-ready
     case insightMomentReached = "insight_moment_reached"
 }

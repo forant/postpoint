@@ -35,6 +35,7 @@ final class DebriefFlowViewModel {
 
     /// Set by the view before generation so history can be gathered
     var allMatches: [Match] = []
+    var allOpponents: [Opponent] = []
 
     private let debriefService = DebriefService()
     private var generationStartTime: Date?
@@ -213,7 +214,8 @@ final class DebriefFlowViewModel {
             opponentIds: resolvedIds,
             opponentNames: opponentNames,
             allMatches: allMatches,
-            isDoubles: isDoubles
+            isDoubles: isDoubles,
+            opponents: allOpponents
         )
         opponentHistorySummary = summary
 
@@ -242,7 +244,7 @@ final class DebriefFlowViewModel {
                 }
                 props["has_opponent_history"] = summary.hasHistory
                 props["has_player_profile"] = profile != nil
-                props["prompt_version"] = "player-profile-v1"
+                props["prompt_version"] = "opponent-insights-v1"
                 if let profile {
                     props["rating_type"] = profile.rating.ratingType.rawValue
                     props["focus_area_count"] = profile.focusAreas.count
@@ -357,6 +359,15 @@ final class DebriefFlowViewModel {
 
         modelContext.insert(match)
 
+        // Append AI-derived opponent insights (does not overwrite user scouting data)
+        if let insights = result.opponentInsights, insights.hasContent {
+            appendInsightsToOpponents(
+                insights: insights,
+                resolvedIds: resolvedIds,
+                context: modelContext
+            )
+        }
+
         // Track match saved
         AnalyticsService.track(.matchSaved, properties: [
             "sport": "tennis",
@@ -387,6 +398,25 @@ final class DebriefFlowViewModel {
             ids.append(opponent.id)
             snapshots.append(opponent.displayName)
         }
+    }
+
+    // MARK: - AI Opponent Insights
+
+    private func appendInsightsToOpponents(
+        insights: OpponentInsights,
+        resolvedIds: [UUID],
+        context: ModelContext
+    ) {
+        let note = AIDerivedNote(from: insights)
+        for id in resolvedIds {
+            guard let opponent = allOpponents.first(where: { $0.id == id }) else { continue }
+            if opponent.scoutingNotes == nil {
+                opponent.scoutingNotes = OpponentScoutingNotes(aiDerivedNotes: [note])
+            } else {
+                opponent.scoutingNotes?.appendAIDerivedNote(note)
+            }
+        }
+        try? context.save()
     }
 
     // MARK: - Analytics

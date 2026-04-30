@@ -7,6 +7,7 @@ struct DebriefFlowView: View {
     @Query(sort: \Match.date, order: .reverse) private var allMatches: [Match]
     @Query(sort: \Opponent.createdAt, order: .reverse) private var allOpponents: [Opponent]
     @State private var viewModel = DebriefFlowViewModel()
+    @State private var showNextMatchPrompt = false
 
     var body: some View {
         NavigationStack {
@@ -15,13 +16,23 @@ struct DebriefFlowView: View {
                     generatingView
                 } else if let error = viewModel.error {
                     errorView(error)
+                } else if showNextMatchPrompt {
+                    ScrollView {
+                        NextMatchPromptView {
+                            dismiss()
+                        }
+                        .padding(.horizontal, AppSpacing.md)
+                        .padding(.top, AppSpacing.lg)
+                    }
                 } else if let result = viewModel.debriefResult {
                     DebriefSummaryView(
                         result: result,
                         opponentHistoryNames: viewModel.opponentHistorySummary?.opponentNamesWithHistory ?? []
                     ) {
                         viewModel.saveMatch(to: modelContext)
-                        dismiss()
+                        withAnimation {
+                            showNextMatchPrompt = true
+                        }
                     }
                 } else {
                     questionFlow
@@ -37,8 +48,12 @@ struct DebriefFlowView: View {
             .onChange(of: allMatches) {
                 viewModel.allMatches = allMatches
             }
+            .onChange(of: allOpponents) {
+                viewModel.allOpponents = allOpponents
+            }
             .onAppear {
                 viewModel.allMatches = allMatches
+                viewModel.allOpponents = allOpponents
                 AnalyticsService.track(.debriefStarted)
                 AnalyticsService.track(.matchEntryStarted)
             }

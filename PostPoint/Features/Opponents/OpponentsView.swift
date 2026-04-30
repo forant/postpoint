@@ -4,6 +4,7 @@ import SwiftData
 struct OpponentsView: View {
     @Query(sort: \Opponent.createdAt, order: .reverse) private var opponents: [Opponent]
     @Query(sort: \Match.date, order: .reverse) private var matches: [Match]
+    @State private var showingScout = false
 
     var body: some View {
         NavigationStack {
@@ -12,7 +13,7 @@ struct OpponentsView: View {
                     ContentUnavailableView(
                         "No Opponents Yet",
                         systemImage: "person.2",
-                        description: Text("Add one during your next debrief.")
+                        description: Text("Scout an opponent or add one during your next debrief.")
                     )
                 } else {
                     List(sortedOpponents) { opponent in
@@ -34,6 +35,18 @@ struct OpponentsView: View {
                 }
             }
             .navigationTitle("Opponents")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingScout = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingScout) {
+                ScoutOpponentView()
+            }
         }
     }
 
@@ -66,10 +79,17 @@ private struct OpponentRow: View {
                 Text(opponent.displayName)
                     .font(AppFont.headline())
 
-                if let lastDate = matches.first?.date {
-                    Text(lastDate, format: .dateTime.month(.abbreviated).day().year())
-                        .font(AppFont.caption())
-                        .foregroundStyle(AppColors.tertiaryLabel)
+                HStack(spacing: AppSpacing.xs) {
+                    if let lastDate = matches.first?.date {
+                        Text(lastDate, format: .dateTime.month(.abbreviated).day().year())
+                            .font(AppFont.caption())
+                            .foregroundStyle(AppColors.tertiaryLabel)
+                    }
+                    if opponent.scoutingNotes != nil {
+                        Image(systemName: "note.text")
+                            .font(.caption2)
+                            .foregroundStyle(AppColors.primary)
+                    }
                 }
             }
 

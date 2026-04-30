@@ -3,11 +3,13 @@ import SwiftUI
 struct OpponentDetailView: View {
     let opponent: Opponent
     let matches: [Match]
+    @State private var showingScout = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.lg) {
                 headerSection
+                scoutingSection
                 statsSection
                 if let latestAdjustment = latestNextMatchAdjustment {
                     latestAdjustmentSection(latestAdjustment)
@@ -19,6 +21,18 @@ struct OpponentDetailView: View {
         }
         .navigationTitle(opponent.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingScout = true
+                } label: {
+                    Image(systemName: "pencil")
+                }
+            }
+        }
+        .sheet(isPresented: $showingScout) {
+            ScoutOpponentView(existingOpponent: opponent)
+        }
     }
 
     // MARK: - Header
@@ -52,6 +66,71 @@ struct OpponentDetailView: View {
         .padding(.horizontal, AppSpacing.md)
         .padding(.vertical, AppSpacing.sm)
         .background(AppColors.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Scouting Notes
+
+    @ViewBuilder
+    private var scoutingSection: some View {
+        if let notes = opponent.scoutingNotes, !notes.isEmpty {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                HStack(spacing: AppSpacing.sm) {
+                    Image(systemName: "note.text")
+                        .foregroundStyle(AppColors.primary)
+                    Text("Scouting Notes")
+                        .font(AppFont.caption())
+                        .foregroundStyle(AppColors.secondaryLabel)
+                        .textCase(.uppercase)
+                }
+
+                WrappingHStack(spacing: AppSpacing.sm) {
+                    ForEach(scoutingPills(from: notes), id: \.text) { pill in
+                        scoutingPill(pill.text, icon: pill.icon)
+                    }
+                }
+
+                if let note = notes.note, !note.isEmpty {
+                    Text(note)
+                        .font(AppFont.body())
+                        .foregroundStyle(AppColors.secondaryLabel)
+                }
+            }
+            .padding(AppSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        } else {
+            Button {
+                showingScout = true
+            } label: {
+                HStack(spacing: AppSpacing.md) {
+                    Image(systemName: "plus.circle")
+                        .foregroundStyle(AppColors.primary)
+                    Text("Add scouting notes")
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(AppColors.primary)
+                    Spacer()
+                }
+                .padding(AppSpacing.md)
+                .background(AppColors.primary.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func scoutingPill(_ text: String, icon: String) -> some View {
+        HStack(spacing: AppSpacing.xs) {
+            Image(systemName: icon)
+                .font(.caption2)
+            Text(text)
+                .font(AppFont.caption())
+        }
+        .padding(.horizontal, AppSpacing.sm)
+        .padding(.vertical, AppSpacing.xs)
+        .background(AppColors.primary.opacity(0.1))
+        .foregroundStyle(AppColors.primary)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -152,5 +231,19 @@ struct OpponentDetailView: View {
 
     private var latestNextMatchAdjustment: String? {
         matches.first(where: { $0.debriefResult != nil })?.debriefResult?.nextMatchAdjustment
+    }
+
+    private struct PillData: Hashable {
+        let text: String
+        let icon: String
+    }
+
+    private func scoutingPills(from notes: OpponentScoutingNotes) -> [PillData] {
+        var pills: [PillData] = []
+        if let style = notes.style { pills.append(PillData(text: style.rawValue, icon: "figure.tennis")) }
+        if let weapon = notes.weapon { pills.append(PillData(text: weapon.rawValue, icon: "bolt.fill")) }
+        if let weakness = notes.weakness { pills.append(PillData(text: weakness.rawValue, icon: "target")) }
+        if let tendency = notes.tendency { pills.append(PillData(text: tendency.rawValue, icon: "arrow.triangle.branch")) }
+        return pills
     }
 }

@@ -16,6 +16,9 @@ struct MatchDetailView: View {
                 if let result = match.debriefResult {
                     debriefResultSection(result)
                 }
+                if let insights = match.debriefResult?.opponentInsights, insights.hasContent {
+                    opponentNotesSection(insights)
+                }
                 if match.debriefInput == nil {
                     noDebriefPlaceholder
                 }
@@ -190,6 +193,60 @@ struct MatchDetailView: View {
                 icon: "arrow.right.circle.fill",
                 content: result.nextMatchAdjustment
             )
+        }
+    }
+
+    // MARK: - Opponent Notes
+
+    private func opponentNotesSection(_ insights: OpponentInsights) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            sectionHeader("Opponent Notes")
+
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                HStack(spacing: AppSpacing.sm) {
+                    Image(systemName: "person.fill.viewfinder")
+                        .foregroundStyle(AppColors.primary)
+                    Text("Early read based on this match")
+                        .font(AppFont.caption())
+                        .foregroundStyle(AppColors.secondaryLabel)
+                }
+
+                if !insights.observedStrengths.isEmpty {
+                    insightRow(label: "Strengths", items: insights.observedStrengths, icon: "bolt.fill")
+                }
+                if !insights.observedWeaknesses.isEmpty {
+                    insightRow(label: "Weaknesses", items: insights.observedWeaknesses, icon: "target")
+                }
+                if !insights.likelyPatterns.isEmpty {
+                    insightRow(label: "Patterns", items: insights.likelyPatterns, icon: "arrow.triangle.branch")
+                }
+                if !insights.recommendedApproachNextTime.isEmpty {
+                    insightRow(label: "Next time", items: insights.recommendedApproachNextTime, icon: "lightbulb.fill")
+                }
+            }
+            .padding(AppSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    private func insightRow(label: String, items: [String], icon: String) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            HStack(spacing: AppSpacing.xs) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.primary)
+                Text(label)
+                    .font(AppFont.caption())
+                    .foregroundStyle(AppColors.secondaryLabel)
+                    .textCase(.uppercase)
+            }
+            ForEach(items, id: \.self) { item in
+                Text("• \(item)")
+                    .font(AppFont.body())
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

@@ -60,10 +60,11 @@ struct DebriefService {
             nextMatchAdjustment: result.nextMatchAdjustment,
             aiContext: AIContext(
                 sport: input.sport,
-                promptVersion: "player-profile-v1",
+                promptVersion: "opponent-insights-v1",
                 generatedAt: Date(),
                 model: "gpt-4o-mini"
-            )
+            ),
+            opponentInsights: result.opponentInsights
         )
     }
 
@@ -104,6 +105,7 @@ private struct DebriefResponse: Decodable {
     let primaryIssue: String
     let explanation: String
     let nextMatchAdjustment: String
+    let opponentInsights: OpponentInsights?
 }
 
 private struct BackendError: Decodable {

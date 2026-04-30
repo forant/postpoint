@@ -1,13 +1,19 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct PostPointApp: App {
     // Bump this any time you change model fields during development.
     // This forces a clean store reset so you never hit schema mismatch crashes.
-    private static let schemaVersion = 11
+    private static let schemaVersion = 13
 
     @State private var hasCompletedOnboarding = PlayerProfile.hasCompletedOnboarding
+    @State private var hasSeenIntro = IntroView.hasSeenIntro
+    @State private var showPreMatchBrief = false
+    @State private var showSplash = true
+
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -39,9 +45,22 @@ struct PostPointApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if hasCompletedOnboarding {
+                if showSplash {
+                    SplashScreenView {
+                        showSplash = false
+                    }
+                } else if hasCompletedOnboarding {
                     MainTabView()
                         .task { migrateOrphanedMatches() }
+                        .fullScreenCover(isPresented: $showPreMatchBrief) {
+                            PreMatchBriefView()
+                        }
+                } else if !hasSeenIntro {
+                    IntroView {
+                        withAnimation {
+                            hasSeenIntro = true
+                        }
+                    }
                 } else {
                     OnboardingView {
                         withAnimation {
@@ -53,10 +72,15 @@ struct PostPointApp: App {
             .onAppear {
                 AnalyticsService.initialize()
                 AnalyticsService.track(.appOpened)
+                appDelegate.onNotificationTapped = {
+                    showPreMatchBrief = true
+                }
             }
         }
         .modelContainer(sharedModelContainer)
     }
+
+    // MARK: - Migrations
 
     /// Backfills opponentIds for matches that have a name but no linked Opponent.
     /// Safe to run repeatedly — skips matches already linked.
@@ -90,5 +114,43 @@ struct PostPointApp: App {
         }
 
         try? context.save()
+    }
+}
+
+// MARK: - App Delegate (Notification Handling)
+
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    var onNotificationTapped: (() -> Void)?
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    /// Called when user taps a notification while app is in foreground or background
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        if userInfo["type"] as? String == "pre_match_brief" {
+            DispatchQueue.main.async { [weak self] in
+                self?.onNotificationTapped?()
+            }
+        }
+        completionHandler()
+    }
+
+    /// Show notification even when app is in foreground
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
     }
 }
