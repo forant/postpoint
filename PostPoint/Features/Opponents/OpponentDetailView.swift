@@ -222,7 +222,7 @@ struct OpponentDetailView: View {
     // MARK: - Helpers
 
     private var wins: Int { matches.filter(\.isWin).count }
-    private var losses: Int { matches.filter { !$0.isWin && $0.debriefInput != nil }.count }
+    private var losses: Int { matches.filter { !$0.isWin && $0.hasDebrief }.count }
 
     private var record: String? {
         guard wins + losses > 0 else { return nil }
@@ -230,7 +230,7 @@ struct OpponentDetailView: View {
     }
 
     private var latestNextMatchAdjustment: String? {
-        matches.first(where: { $0.debriefResult != nil })?.debriefResult?.nextMatchAdjustment
+        matches.first(where: { $0.hasDebrief })?.nextMatchAdjustment
     }
 
     private struct PillData: Hashable {

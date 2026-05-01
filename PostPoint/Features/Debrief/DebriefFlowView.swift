@@ -7,6 +7,7 @@ struct DebriefFlowView: View {
     @Query(sort: \Match.date, order: .reverse) private var allMatches: [Match]
     @Query(sort: \Opponent.createdAt, order: .reverse) private var allOpponents: [Opponent]
     @State private var viewModel = DebriefFlowViewModel()
+    @State private var showSIWAPrompt = false
     @State private var showNextMatchPrompt = false
 
     var body: some View {
@@ -30,8 +31,13 @@ struct DebriefFlowView: View {
                         opponentHistoryNames: viewModel.opponentHistorySummary?.opponentNamesWithHistory ?? []
                     ) {
                         viewModel.saveMatch(to: modelContext)
+                        let debriefCount = allMatches.filter(\.hasDebrief).count + 1
                         withAnimation {
-                            showNextMatchPrompt = true
+                            if AuthService.shared.shouldPromptSIWA(debriefCount: debriefCount) {
+                                showSIWAPrompt = true
+                            } else {
+                                showNextMatchPrompt = true
+                            }
                         }
                     }
                 } else {
@@ -56,6 +62,20 @@ struct DebriefFlowView: View {
                 viewModel.allOpponents = allOpponents
                 AnalyticsService.track(.debriefStarted)
                 AnalyticsService.track(.matchEntryStarted)
+            }
+            .sheet(isPresented: $showSIWAPrompt, onDismiss: {
+                if !AuthService.shared.isSignedIn {
+                    let debriefCount = allMatches.filter(\.hasDebrief).count + 1
+                    AuthService.shared.dismissSIWAPrompt(debriefCount: debriefCount)
+                }
+                withAnimation {
+                    showNextMatchPrompt = true
+                }
+            }) {
+                SIWAPromptView {
+                    showSIWAPrompt = false
+                }
+                .presentationDetents([.medium])
             }
         }
     }
@@ -108,7 +128,7 @@ struct DebriefFlowView: View {
             ) {
                 viewModel.selectedProblems.removeAll()
                 viewModel.selectedImprovementAreas.removeAll()
-                viewModel.selectedWhatWorked = nil
+                viewModel.selectedWhatWorked.removeAll()
                 // Clear second opponent when switching away from doubles
                 if $0 == .singles {
                     viewModel.secondOpponentName = ""
@@ -139,11 +159,14 @@ struct DebriefFlowView: View {
 
         case .whatWorked:
             DebriefQuestionView(
-                prompt: "What worked well?",
+                prompt: "What went well?",
                 options: WhatWorked.allCases,
                 icon: \.icon,
-                selection: setFrom(viewModel.selectedWhatWorked)
-            ) { viewModel.selectAndAdvance($0, binding: \.selectedWhatWorked) }
+                selection: viewModel.selectedWhatWorked,
+                multiSelect: true,
+                maxSelections: 4,
+                helperText: "Pick the main things that helped you today."
+            ) { viewModel.toggleWhatWorked($0) }
 
         case .improvementAreas:
             DebriefQuestionView(
@@ -269,7 +292,7 @@ struct DebriefFlowView: View {
     private var sortedOpponents: [Opponent] {
         let matchDates: [UUID: Date] = Dictionary(
             allMatches.flatMap { match in
-                match.opponentIds.map { ($0, match.date) }
+                match.safeOpponentIds.map { ($0, match.date) }
             },
             uniquingKeysWith: { a, b in max(a, b) }
         )

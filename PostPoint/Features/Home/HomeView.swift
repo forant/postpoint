@@ -25,6 +25,16 @@ struct HomeView: View {
                 .padding(.top, AppSpacing.md)
             }
             .navigationTitle("PostPoint")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        viewModel.showingAccount = true
+                    } label: {
+                        Image(systemName: AuthService.shared.isSignedIn ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle")
+                            .foregroundStyle(AppColors.primary)
+                    }
+                }
+            }
             .onAppear {
                 viewModel.loadNextMatch()
             }
@@ -64,6 +74,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $viewModel.showingScoutOpponent) {
                 ScoutOpponentView()
+            }
+            .sheet(isPresented: $viewModel.showingAccount) {
+                AccountView()
             }
             .onChange(of: viewModel.showingScoutOpponent) { _, isShowing in
                 if !isShowing { viewModel.loadNextMatch() }

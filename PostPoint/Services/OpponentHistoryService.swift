@@ -27,14 +27,12 @@ struct OpponentHistoryService {
         var sections: [String] = []
         var namesWithHistory: [String] = []
 
-        // Per-opponent summaries
         for (index, opponentId) in opponentIds.enumerated() {
             let name = index < opponentNames.count ? opponentNames[index] : "Opponent \(index + 1)"
             let priorMatches = allMatches
-                .filter { $0.opponentIds.contains(opponentId) }
+                .filter { $0.safeOpponentIds.contains(opponentId) }
                 .sorted { $0.date > $1.date }
 
-            // If no matches but has scouting notes, still include
             if priorMatches.isEmpty {
                 if let opponent = opponents.first(where: { $0.id == opponentId }),
                    let scoutContext = opponent.scoutingNotes?.promptContext {
@@ -46,19 +44,18 @@ struct OpponentHistoryService {
             namesWithHistory.append(name)
 
             let wins = priorMatches.filter(\.isWin).count
-            let losses = priorMatches.filter { !$0.isWin && $0.debriefInput != nil }.count
+            let losses = priorMatches.filter { !$0.isWin && $0.hasDebrief }.count
             let record = "\(wins)\u{2013}\(losses)"
 
             var lines: [String] = []
             lines.append("- \(name): \(priorMatches.count) prior match\(priorMatches.count == 1 ? "" : "es"), user record \(record).")
 
-            // Most recent match details
             if let latest = priorMatches.first {
                 var recentParts: [String] = []
-                if let result = latest.debriefInput?.result {
+                if let result = latest.result {
                     recentParts.append(result.rawValue.lowercased())
                 }
-                if let score = latest.debriefInput?.scoreDisplay {
+                if let score = latest.scoreDisplay {
                     recentParts.append(score)
                 }
                 if !recentParts.isEmpty {
@@ -66,19 +63,16 @@ struct OpponentHistoryService {
                 }
             }
 
-            // Recurring themes from prior debriefs (up to 3 most recent)
             let themes = extractThemes(from: priorMatches)
             if !themes.isEmpty {
                 lines.append("  Prior themes: \(themes.joined(separator: "; ")).")
             }
 
-            // Most recent next-match focus
-            if let lastFocus = priorMatches.first(where: { $0.debriefResult != nil })?.debriefResult?.nextMatchAdjustment {
+            if let lastFocus = priorMatches.first(where: { $0.hasDebrief })?.nextMatchAdjustment {
                 let truncated = String(lastFocus.prefix(150))
                 lines.append("  Last recommended focus: \(truncated)")
             }
 
-            // Scouting notes (user-perceived, not objective)
             if let opponent = opponents.first(where: { $0.id == opponentId }),
                let scoutContext = opponent.scoutingNotes?.promptContext {
                 lines.append("  Scouting notes: \(scoutContext)")
@@ -87,17 +81,16 @@ struct OpponentHistoryService {
             sections.append(lines.joined(separator: "\n"))
         }
 
-        // Doubles pair context
         if isDoubles, opponentIds.count == 2 {
             let pairMatches = allMatches.filter { match in
-                opponentIds.allSatisfy { match.opponentIds.contains($0) }
+                opponentIds.allSatisfy { match.safeOpponentIds.contains($0) }
             }
             let pairNames = opponentNames.joined(separator: " + ")
             if pairMatches.isEmpty {
                 sections.append("- \(pairNames) as a pair: no prior matches together.")
             } else {
                 let wins = pairMatches.filter(\.isWin).count
-                let losses = pairMatches.filter { !$0.isWin && $0.debriefInput != nil }.count
+                let losses = pairMatches.filter { !$0.isWin && $0.hasDebrief }.count
                 sections.append("- \(pairNames) as a pair: \(pairMatches.count) prior match\(pairMatches.count == 1 ? "" : "es"), user record \(wins)\u{2013}\(losses).")
             }
         }
@@ -111,15 +104,11 @@ struct OpponentHistoryService {
         return OpponentHistorySummary(text: fullText, opponentNamesWithHistory: namesWithHistory)
     }
 
-    // MARK: - Theme Extraction
-
-    /// Extracts primary issues from up to 3 most recent debriefed matches.
     private static func extractThemes(from matches: [Match]) -> [String] {
         matches
             .prefix(3)
-            .compactMap { $0.debriefResult?.primaryIssue }
+            .compactMap { $0.primaryIssue }
             .map { issue in
-                // Lowercase first char for inline use
                 let trimmed = issue.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard let first = trimmed.first else { return trimmed }
                 return String(first).lowercased() + trimmed.dropFirst()

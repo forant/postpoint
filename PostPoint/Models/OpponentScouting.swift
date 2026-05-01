@@ -73,6 +73,17 @@ struct OpponentScoutingNotes: Codable, Equatable {
         self.aiDerivedNotes = aiDerivedNotes
     }
 
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        style = try? c.decodeIfPresent(OpponentStyle.self, forKey: .style)
+        weapon = try? c.decodeIfPresent(OpponentWeapon.self, forKey: .weapon)
+        weakness = try? c.decodeIfPresent(OpponentWeakness.self, forKey: .weakness)
+        tendency = try? c.decodeIfPresent(OpponentTendency.self, forKey: .tendency)
+        note = try? c.decodeIfPresent(String.self, forKey: .note)
+        updatedAt = (try? c.decodeIfPresent(Date.self, forKey: .updatedAt)) ?? Date()
+        aiDerivedNotes = try? c.decodeIfPresent([AIDerivedNote].self, forKey: .aiDerivedNotes)
+    }
+
     var isEmpty: Bool {
         style == nil && weapon == nil && weakness == nil && tendency == nil && (note ?? "").isEmpty
     }
@@ -124,5 +135,14 @@ struct AIDerivedNote: Codable, Equatable {
         self.observedWeaknesses = insights.observedWeaknesses
         self.likelyPatterns = insights.likelyPatterns
         self.confidence = insights.confidence.rawValue
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        matchDate = (try? c.decodeIfPresent(Date.self, forKey: .matchDate)) ?? Date()
+        observedStrengths = (try? c.decodeIfPresent([String].self, forKey: .observedStrengths)) ?? []
+        observedWeaknesses = (try? c.decodeIfPresent([String].self, forKey: .observedWeaknesses)) ?? []
+        likelyPatterns = (try? c.decodeIfPresent([String].self, forKey: .likelyPatterns)) ?? []
+        confidence = (try? c.decodeIfPresent(String.self, forKey: .confidence)) ?? InsightConfidence.low.rawValue
     }
 }

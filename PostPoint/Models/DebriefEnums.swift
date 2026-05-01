@@ -116,26 +116,36 @@ enum NotableContext: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Win Path: What Worked (single-select)
+// MARK: - Win Path: What Worked (multi-select)
 
 enum WhatWorked: String, Codable, CaseIterable, Identifiable {
+    case serve = "Serve"
+    case returnOfServe = "Return"
     case consistency = "Consistency"
-    case servePressure = "Serve pressure"
-    case returnQuality = "Return quality"
-    case movementPositioning = "Movement / positioning"
+    case aggression = "Aggression"
     case netPlay = "Net play"
-    case mentalComposure = "Mental composure"
+    case movement = "Movement"
+    case mentalToughness = "Mental toughness"
+    case strategy = "Strategy"
+    case shotSelection = "Shot selection"
+    case fitness = "Fitness"
+    case adaptability = "Adaptability"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
+        case .serve: return "bolt.fill"
+        case .returnOfServe: return "arrow.uturn.left"
         case .consistency: return "arrow.left.arrow.right"
-        case .servePressure: return "bolt.fill"
-        case .returnQuality: return "arrow.uturn.left"
-        case .movementPositioning: return "figure.walk"
+        case .aggression: return "flame.fill"
         case .netPlay: return "arrow.up.and.down"
-        case .mentalComposure: return "brain.head.profile"
+        case .movement: return "figure.walk"
+        case .mentalToughness: return "brain.head.profile"
+        case .strategy: return "map.fill"
+        case .shotSelection: return "scope"
+        case .fitness: return "heart.fill"
+        case .adaptability: return "arrow.triangle.2.circlepath"
         }
     }
 }

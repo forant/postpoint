@@ -38,7 +38,7 @@ struct MatchRowView: View {
                     .foregroundStyle(AppColors.tertiaryLabel)
 
                 // Debrief primary issue or notes preview
-                if let issue = match.debriefResult?.primaryIssue {
+                if let issue = match.primaryIssue {
                     Text(issue)
                         .font(AppFont.subheadline())
                         .foregroundStyle(AppColors.secondaryLabel)
@@ -63,7 +63,7 @@ struct MatchRowView: View {
     }
 
     private var resultColor: Color {
-        guard let result = match.debriefInput?.result else { return AppColors.secondaryLabel }
+        guard let result = match.result else { return AppColors.secondaryLabel }
         switch result {
         case .wonComfortably, .wonClose: return AppColors.tennis
         case .lostClose, .lostBadly: return .red

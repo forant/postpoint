@@ -95,7 +95,7 @@ Bad nextMatchAdjustment: "Work on being more consistent."
 Good nextMatchAdjustment: "For the first three shots of each rally, choose height and depth over direction changes. Make your opponent create the miss."
 
 Win-specific rules:
-- When the player WON, the "whatWorked" field tells you their perceived strength. Acknowledge it briefly.
+- When the player WON, the "whatWorked" field lists their perceived strengths (may be multiple). Acknowledge the top 1-2 briefly.
 - The "improvementAreas" tell you what they want to sharpen. Use these to frame the primary issue and adjustment.
 - Do NOT turn a win debrief into a loss debrief. Keep the tone constructive and forward-looking.
 - The primary issue for a win should be framed as an opportunity, not a failure (e.g. "Rushed net approaches" not "Poor net play").

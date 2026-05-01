@@ -289,10 +289,9 @@ struct ScoutOpponentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                dismiss()
-            }
+        .task {
+            try? await Task.sleep(for: .seconds(1))
+            dismiss()
         }
     }
 

@@ -31,6 +31,10 @@ enum AnalyticsEvent: String {
     case preMatchBriefGenerated = "pre_match_brief_generated"
     case preMatchBriefFailed = "pre_match_brief_failed"
 
+    // Auth
+    case siwaCompleted = "siwa_completed"
+    case siwaDismissed = "siwa_dismissed"
+
     // Paywall-ready
     case insightMomentReached = "insight_moment_reached"
 }

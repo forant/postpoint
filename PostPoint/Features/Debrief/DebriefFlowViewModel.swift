@@ -25,7 +25,7 @@ final class DebriefFlowViewModel {
     var selectedContexts: Set<NotableContext> = []
     var contextNote: String = ""
     // Win-path answers
-    var selectedWhatWorked: WhatWorked?
+    var selectedWhatWorked: Set<WhatWorked> = []
     var selectedImprovementAreas: Set<ImprovementArea> = []
 
     // Completion state
@@ -80,8 +80,8 @@ final class DebriefFlowViewModel {
     /// Steps that auto-advance on selection (single-select, no text input)
     var isAutoAdvanceStep: Bool {
         switch currentStepKind {
-        case .result, .format, .whatWorked, .pattern, .opponentLevel: return true
-        case .opponent, .score, .biggestProblems, .improvementAreas, .context: return false
+        case .result, .format, .pattern, .opponentLevel: return true
+        case .opponent, .score, .biggestProblems, .whatWorked, .improvementAreas, .context: return false
         }
     }
 
@@ -95,7 +95,7 @@ final class DebriefFlowViewModel {
         case .format: return selectedFormat != nil
         case .opponent: return true  // Opponent is optional
         case .biggestProblems: return !selectedProblems.isEmpty && selectedProblems.count <= 2
-        case .whatWorked: return selectedWhatWorked != nil
+        case .whatWorked: return !selectedWhatWorked.isEmpty
         case .improvementAreas: return !selectedImprovementAreas.isEmpty && selectedImprovementAreas.count <= 2
         case .pattern: return selectedPattern != nil
         case .opponentLevel: return selectedOpponentLevel != nil
@@ -154,6 +154,14 @@ final class DebriefFlowViewModel {
             selectedProblems.remove(problem)
         } else if selectedProblems.count < 2 {
             selectedProblems.insert(problem)
+        }
+    }
+
+    func toggleWhatWorked(_ item: WhatWorked) {
+        if selectedWhatWorked.contains(item) {
+            selectedWhatWorked.remove(item)
+        } else if selectedWhatWorked.count < 4 {
+            selectedWhatWorked.insert(item)
         }
     }
 
@@ -254,7 +262,7 @@ final class DebriefFlowViewModel {
                 AnalyticsService.track(.debriefViewed, properties: props)
 
                 // insight_moment_reached
-                let debriefCount = allMatches.filter { $0.debriefResult != nil }.count + 1
+                let debriefCount = allMatches.filter { $0.hasDebrief }.count + 1
                 AnalyticsService.track(.insightMomentReached, properties: [
                     "completed_match_count": allMatches.count + 1,
                     "completed_debrief_count": debriefCount,
@@ -290,12 +298,13 @@ final class DebriefFlowViewModel {
 
         // Validate path-specific requirements
         if isWin {
-            guard selectedWhatWorked != nil, !selectedImprovementAreas.isEmpty else { return nil }
+            guard !selectedWhatWorked.isEmpty, !selectedImprovementAreas.isEmpty else { return nil }
         } else {
             guard !selectedProblems.isEmpty else { return nil }
         }
 
         let trimmedNote = contextNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        let whatWorkedArray = isWin ? Array(selectedWhatWorked) : nil
 
         return DebriefInput(
             result: result,
@@ -306,7 +315,8 @@ final class DebriefFlowViewModel {
             opponentLevel: level,
             notableContexts: Array(selectedContexts),
             contextNote: trimmedNote.isEmpty ? nil : trimmedNote,
-            whatWorked: isWin ? selectedWhatWorked : nil,
+            whatWorked: whatWorkedArray?.first,
+            whatWorkedItems: whatWorkedArray,
             improvementAreas: isWin ? Array(selectedImprovementAreas) : nil,
             sport: .tennis,
             scoringSystem: .tennisSets,
@@ -350,10 +360,17 @@ final class DebriefFlowViewModel {
             notes: "\(input.result.rawValue)\(scoreNote) \u{2022} \(input.matchPattern.rawValue)",
             matchFormat: input.matchFormat,
             scoringSystem: .tennisSets,
+            result: input.result,
+            matchPattern: input.matchPattern,
+            opponentLevel: input.opponentLevel,
+            scoreDisplay: input.scoreDisplay,
             opponentIds: resolvedIds,
             opponentNameSnapshots: snapshots,
-            debriefInput: input,
-            debriefResult: result,
+            primaryIssue: result.primaryIssue,
+            explanation: result.explanation,
+            nextMatchAdjustment: result.nextMatchAdjustment,
+            debriefInputArchive: input,
+            debriefResultArchive: result,
             ownerUserId: UserIdentityService.shared.anonymousUserId
         )
 

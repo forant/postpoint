@@ -38,12 +38,15 @@ struct PreMatchBriefService {
         let recentSummaries = recentMatches
             .prefix(3)
             .compactMap { match -> RecentDebriefSummary? in
-                guard let input = match.debriefInput, let result = match.debriefResult else { return nil }
+                guard match.hasDebrief,
+                      let result = match.result,
+                      let primaryIssue = match.primaryIssue,
+                      let nextMatchAdjustment = match.nextMatchAdjustment else { return nil }
                 return RecentDebriefSummary(
-                    result: input.result.rawValue,
-                    score: input.scoreDisplay,
-                    primaryIssue: result.primaryIssue,
-                    nextMatchAdjustment: result.nextMatchAdjustment,
+                    result: result.rawValue,
+                    score: match.scoreDisplay,
+                    primaryIssue: primaryIssue,
+                    nextMatchAdjustment: nextMatchAdjustment,
                     opponentName: match.displayOpponentName
                 )
             }

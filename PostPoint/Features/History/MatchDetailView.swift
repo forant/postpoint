@@ -7,19 +7,19 @@ struct MatchDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.lg) {
                 matchInfoSection
-                if let input = match.debriefInput {
+                if let input = match.debriefInputArchive {
                     debriefInputSection(input)
                 }
-                if let input = match.debriefInput, input.hasContext {
+                if let input = match.debriefInputArchive, input.hasContext {
                     contextSection(input)
                 }
-                if let result = match.debriefResult {
-                    debriefResultSection(result)
+                if match.hasDebrief {
+                    debriefResultSection
                 }
-                if let insights = match.debriefResult?.opponentInsights, insights.hasContent {
+                if let insights = match.debriefResultArchive?.opponentInsights, insights.hasContent {
                     opponentNotesSection(insights)
                 }
-                if match.debriefInput == nil {
+                if !match.hasDebrief {
                     noDebriefPlaceholder
                 }
             }
@@ -34,7 +34,6 @@ struct MatchDetailView: View {
 
     private var matchInfoSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
-            // Header with sport icon and opponent
             HStack(spacing: AppSpacing.md) {
                 Image(systemName: match.sport.icon)
                     .font(.title2)
@@ -52,13 +51,12 @@ struct MatchDetailView: View {
                 }
             }
 
-            // Quick stats row
             HStack(spacing: AppSpacing.md) {
                 infoPill(match.sport.rawValue, icon: match.sport.icon)
-                if let result = match.debriefInput?.result {
+                if let result = match.result {
                     infoPill(result.rawValue, icon: result.icon)
                 }
-                if let score = match.debriefInput?.scoreDisplay {
+                if let score = match.scoreDisplay {
                     infoPill(score, icon: "number")
                 }
             }
@@ -78,7 +76,7 @@ struct MatchDetailView: View {
         .clipShape(Capsule())
     }
 
-    // MARK: - Debrief Inputs
+    // MARK: - Debrief Inputs (from archive)
 
     private func debriefInputSection(_ input: DebriefInput) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
@@ -108,9 +106,21 @@ struct MatchDetailView: View {
                     }
                 }
 
-                if let whatWorked = input.whatWorked {
+                if !input.allWhatWorked.isEmpty {
                     Divider()
-                    detailRow("What Worked", value: whatWorked.rawValue, icon: whatWorked.icon)
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        detailLabel("What Went Well", icon: "checkmark.circle")
+                        ForEach(input.allWhatWorked) { item in
+                            HStack(spacing: AppSpacing.sm) {
+                                Image(systemName: item.icon)
+                                    .font(.caption)
+                                    .foregroundStyle(AppColors.primary)
+                                    .frame(width: 20)
+                                Text(item.rawValue)
+                                    .font(AppFont.body())
+                            }
+                        }
+                    }
                 }
 
                 if let areas = input.improvementAreas, !areas.isEmpty {
@@ -133,7 +143,7 @@ struct MatchDetailView: View {
         }
     }
 
-    // MARK: - Context
+    // MARK: - Context (from archive)
 
     private func contextSection(_ input: DebriefInput) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
@@ -170,33 +180,25 @@ struct MatchDetailView: View {
         }
     }
 
-    // MARK: - Debrief Result
+    // MARK: - Debrief Result (from flattened fields)
 
-    private func debriefResultSection(_ result: DebriefResult) -> some View {
+    private var debriefResultSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
             sectionHeader("Debrief")
 
-            resultCard(
-                label: "Primary Issue",
-                icon: "target",
-                content: result.primaryIssue
-            )
-
-            resultCard(
-                label: "What Happened",
-                icon: "magnifyingglass",
-                content: result.explanation
-            )
-
-            resultCard(
-                label: "Next Match",
-                icon: "arrow.right.circle.fill",
-                content: result.nextMatchAdjustment
-            )
+            if let issue = match.primaryIssue {
+                resultCard(label: "Primary Issue", icon: "target", content: issue)
+            }
+            if let explanation = match.explanation {
+                resultCard(label: "What Happened", icon: "magnifyingglass", content: explanation)
+            }
+            if let adjustment = match.nextMatchAdjustment {
+                resultCard(label: "Next Match", icon: "arrow.right.circle.fill", content: adjustment)
+            }
         }
     }
 
-    // MARK: - Opponent Notes
+    // MARK: - Opponent Notes (from archive)
 
     private func opponentNotesSection(_ insights: OpponentInsights) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {

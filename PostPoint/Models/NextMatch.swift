@@ -56,6 +56,12 @@ struct NextMatch: Codable, Equatable {
         Calendar.current.isDateInToday(scheduledDate) || scheduledDate > Date()
     }
 
+    /// Whether the next match is strictly in the future (not today).
+    /// Used post-debrief to avoid showing today's match as "next" after it's been played.
+    var isFutureMatch: Bool {
+        !Calendar.current.isDateInToday(scheduledDate) && scheduledDate > Date()
+    }
+
     /// Whether the pre-match brief should be visible (day before through match day)
     var isBriefReady: Bool {
         let calendar = Calendar.current

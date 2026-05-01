@@ -54,7 +54,7 @@ struct OpponentsView: View {
     private var sortedOpponents: [Opponent] {
         let matchDates: [UUID: Date] = Dictionary(
             matches.flatMap { match in
-                match.opponentIds.map { ($0, match.date) }
+                match.safeOpponentIds.map { ($0, match.date) }
             },
             uniquingKeysWith: { a, b in max(a, b) }
         )
@@ -111,7 +111,7 @@ private struct OpponentRow: View {
 
     private var record: String? {
         let wins = matches.filter(\.isWin).count
-        let losses = matches.filter { !$0.isWin && $0.debriefInput != nil }.count
+        let losses = matches.filter { !$0.isWin && $0.hasDebrief }.count
         guard wins + losses > 0 else { return nil }
         return "\(wins)\u{2013}\(losses)"
     }

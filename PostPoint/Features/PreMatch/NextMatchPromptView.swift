@@ -63,7 +63,7 @@ struct NextMatchPromptView: View {
             .padding(.top, AppSpacing.sm)
         }
         .onAppear {
-            if let existing = NextMatch.load(), existing.isUpcoming {
+            if let existing = NextMatch.load(), existing.isFutureMatch {
                 existingMatch = existing
                 hasExistingMatch = true
                 scheduledDate = existing.scheduledDate

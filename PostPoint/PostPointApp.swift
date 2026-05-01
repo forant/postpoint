@@ -6,7 +6,7 @@ import UserNotifications
 struct PostPointApp: App {
     // Bump this any time you change model fields during development.
     // This forces a clean store reset so you never hit schema mismatch crashes.
-    private static let schemaVersion = 13
+    private static let schemaVersion = 16
 
     @State private var hasCompletedOnboarding = PlayerProfile.hasCompletedOnboarding
     @State private var hasSeenIntro = IntroView.hasSeenIntro
@@ -89,12 +89,12 @@ struct PostPointApp: App {
         let context = sharedModelContainer.mainContext
         guard let allMatches = try? context.fetch(FetchDescriptor<Match>()) else { return }
 
-        let orphans = allMatches.filter { $0.opponentIds.isEmpty }
+        let orphans = allMatches.filter { $0.safeOpponentIds.isEmpty }
 
         for match in orphans {
-            let names = match.opponentNameSnapshots.isEmpty
+            let names = match.safeOpponentNameSnapshots.isEmpty
                 ? [match.opponentName.trimmingCharacters(in: .whitespacesAndNewlines)]
-                : match.opponentNameSnapshots
+                : match.safeOpponentNameSnapshots
 
             var ids: [UUID] = []
             var snapshots: [String] = []
@@ -106,9 +106,9 @@ struct PostPointApp: App {
             }
 
             if !ids.isEmpty {
-                match.opponentIds = ids
-                if match.opponentNameSnapshots.isEmpty {
-                    match.opponentNameSnapshots = snapshots
+                match.safeOpponentIds = ids
+                if match.safeOpponentNameSnapshots.isEmpty {
+                    match.safeOpponentNameSnapshots = snapshots
                 }
             }
         }

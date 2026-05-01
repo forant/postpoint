@@ -6,7 +6,7 @@ struct InsightsView: View {
     @State private var showingDebrief = false
 
     private var debriefedMatches: [Match] {
-        matches.filter { $0.debriefInput != nil }
+        matches.filter { $0.hasDebrief }
     }
 
     var body: some View {
@@ -182,7 +182,7 @@ struct InsightsView: View {
     private var focusAreasCard: some View {
         let adjustments = debriefedMatches
             .prefix(3)
-            .compactMap { $0.debriefResult?.nextMatchAdjustment }
+            .compactMap { $0.nextMatchAdjustment }
 
         if !adjustments.isEmpty {
             insightCard(title: "Recent Focus Areas", icon: "target") {
@@ -280,11 +280,11 @@ struct InsightsView: View {
 
     private func isCloseMatch(_ match: Match) -> Bool {
         // Check result type first
-        guard let result = match.debriefInput?.result else { return false }
+        guard let result = match.result else { return false }
         if result == .wonClose || result == .lostClose { return true }
 
         // Check score data: went to deciding set or tight final set
-        guard let lines = match.debriefInput?.scoreLines.filter({ $0.hasScore }),
+        guard let lines = match.debriefInputArchive?.scoreLines.filter({ $0.hasScore }),
               lines.count >= 2 else { return false }
 
         // Deciding set (3rd set in best-of-3)

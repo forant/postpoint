@@ -7,6 +7,7 @@ final class HomeViewModel {
     var showingDebrief = false
     var showingScoutOpponent = false
     var showingPreMatchBrief = false
+    var showingAccount = false
     var showOnboardingResetAlert = false
 
     var nextMatch: NextMatch?

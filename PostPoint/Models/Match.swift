@@ -32,22 +32,46 @@ final class Match {
     var date: Date
     var sport: SportType
     var notes: String
+
+    // MARK: - Match Metadata (flattened, queryable)
+
     var matchFormat: MatchFormat?
     var scoringSystem: ScoringSystem
+    var result: MatchResult?
+    var matchPattern: MatchPattern?
+    var opponentLevel: OpponentLevel?
+    var scoreDisplay: String?
 
-    // Legacy field — kept for backward compatibility with old code paths
+    // MARK: - Opponent (flattened)
+
+    /// Primary display name (joined for doubles, e.g. "Alex & Jordan")
     var opponentName: String
+    /// Individual opponent SwiftData IDs (optional — SwiftData stores empty arrays as NULL)
+    var opponentIds: [UUID]?
+    /// Snapshot of opponent names at match time
+    var opponentNameSnapshots: [String]?
 
-    // Multi-opponent support
-    var opponentIds: [UUID]
-    var opponentNameSnapshots: [String]
+    // MARK: - Debrief Result (flattened, displayed in rows/detail)
 
-    // Debrief data (optional — populated when user completes the flow)
-    var debriefInput: DebriefInput?
-    var debriefResult: DebriefResult?
+    var primaryIssue: String?
+    var explanation: String?
+    var nextMatchAdjustment: String?
 
-    // Owner identity (nil for matches created before identity layer)
+    // MARK: - Archival Blobs (full debrief data for history/AI context)
+
+    /// Full debrief input snapshot — archived for opponent history and AI prompt context.
+    var debriefInputArchive: DebriefInput?
+    /// Full debrief result snapshot — archived for opponent history and AI-derived insights.
+    var debriefResultArchive: DebriefResult?
+
+    // MARK: - Identity
+
     var ownerUserId: String?
+
+    // MARK: - Schema
+
+    /// Local data schema version. Allows future migrations on a per-record basis.
+    var dataVersion: Int = 2
 
     init(
         id: UUID = UUID(),
@@ -57,10 +81,17 @@ final class Match {
         notes: String = "",
         matchFormat: MatchFormat? = nil,
         scoringSystem: ScoringSystem = .tennisSets,
-        opponentIds: [UUID] = [],
-        opponentNameSnapshots: [String] = [],
-        debriefInput: DebriefInput? = nil,
-        debriefResult: DebriefResult? = nil,
+        result: MatchResult? = nil,
+        matchPattern: MatchPattern? = nil,
+        opponentLevel: OpponentLevel? = nil,
+        scoreDisplay: String? = nil,
+        opponentIds: [UUID]? = nil,
+        opponentNameSnapshots: [String]? = nil,
+        primaryIssue: String? = nil,
+        explanation: String? = nil,
+        nextMatchAdjustment: String? = nil,
+        debriefInputArchive: DebriefInput? = nil,
+        debriefResultArchive: DebriefResult? = nil,
         ownerUserId: String? = nil
     ) {
         self.id = id
@@ -70,52 +101,73 @@ final class Match {
         self.notes = notes
         self.matchFormat = matchFormat
         self.scoringSystem = scoringSystem
+        self.result = result
+        self.matchPattern = matchPattern
+        self.opponentLevel = opponentLevel
+        self.scoreDisplay = scoreDisplay
         self.opponentIds = opponentIds
         self.opponentNameSnapshots = opponentNameSnapshots
-        self.debriefInput = debriefInput
-        self.debriefResult = debriefResult
+        self.primaryIssue = primaryIssue
+        self.explanation = explanation
+        self.nextMatchAdjustment = nextMatchAdjustment
+        self.debriefInputArchive = debriefInputArchive
+        self.debriefResultArchive = debriefResultArchive
         self.ownerUserId = ownerUserId
     }
 
-    /// Short summary for display in match rows
-    var resultSummary: String? {
-        debriefInput?.result.rawValue
+    // MARK: - Safe Array Access
+
+    var safeOpponentIds: [UUID] {
+        get { opponentIds ?? [] }
+        set { opponentIds = newValue }
     }
 
-    /// Best available display name for opponent(s)
+    var safeOpponentNameSnapshots: [String] {
+        get { opponentNameSnapshots ?? [] }
+        set { opponentNameSnapshots = newValue }
+    }
+
+    // MARK: - Computed Helpers
+
+    var resultSummary: String? {
+        result?.rawValue
+    }
+
     var displayOpponentName: String {
-        if !opponentNameSnapshots.isEmpty {
-            return opponentNameSnapshots.joined(separator: " & ")
+        let snapshots = safeOpponentNameSnapshots
+        if !snapshots.isEmpty {
+            return snapshots.joined(separator: " & ")
         }
         let trimmed = opponentName.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Unknown Opponent" : trimmed
     }
 
-    /// Whether the match has any opponent info
     var hasOpponent: Bool {
-        !opponentIds.isEmpty
+        !safeOpponentIds.isEmpty
             || !opponentName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Whether this is a doubles match
     var isDoubles: Bool {
         matchFormat == .doubles || matchFormat == .mixed
     }
 
-    /// Whether the debrief result indicates a win
     var isWin: Bool {
-        guard let result = debriefInput?.result else { return false }
+        guard let result else { return false }
         return result == .wonComfortably || result == .wonClose
+    }
+
+    /// Whether this match has a completed debrief
+    var hasDebrief: Bool {
+        primaryIssue != nil
     }
 }
 
 // MARK: - Collection Helpers
 
 extension [Match] {
-    /// Returns matches involving a given opponent ID, sorted newest first
     func matches(against opponentId: UUID, limit: Int? = nil) -> [Match] {
         let filtered = self
-            .filter { $0.opponentIds.contains(opponentId) }
+            .filter { $0.safeOpponentIds.contains(opponentId) }
             .sorted { $0.date > $1.date }
         if let limit { return Array(filtered.prefix(limit)) }
         return filtered
@@ -131,34 +183,22 @@ extension Match {
                 date: Calendar.current.date(byAdding: .hour, value: -2, to: .now)!,
                 opponentName: "Alex Chen",
                 sport: .tennis,
-                notes: "Served well in the first set. Need to work on backhand returns under pressure.",
+                notes: "Served well in the first set.",
                 matchFormat: .singles,
+                result: .wonClose,
+                matchPattern: .longRallies,
+                opponentLevel: .sameLevel,
+                scoreDisplay: "6-4, 3-6, 7-5",
                 opponentNameSnapshots: ["Alex Chen"],
-                debriefInput: DebriefInput(
-                    result: .wonClose,
-                    scoreLines: [
-                        ScoreLine(playerScore: 6, opponentScore: 4),
-                        ScoreLine(playerScore: 3, opponentScore: 6),
-                        ScoreLine(playerScore: 7, opponentScore: 5),
-                    ],
-                    matchFormat: .singles,
-                    biggestProblems: [.unforcedErrors],
-                    matchPattern: .longRallies,
-                    opponentLevel: .sameLevel,
-                    notableContexts: [.fatigued],
-                    contextNote: nil
-                ),
-                debriefResult: DebriefResult(
-                    primaryIssue: "Unforced errors in neutral rallies",
-                    explanation: "Against an equal opponent in long rallies, the match came down to who blinked first. You won, but your unforced errors kept it closer than it needed to be.",
-                    nextMatchAdjustment: "Next match, add one extra shot before going for a winner. Make them play one more ball."
-                )
+                primaryIssue: "Unforced errors in neutral rallies",
+                explanation: "Against an equal opponent in long rallies, the match came down to who blinked first.",
+                nextMatchAdjustment: "Next match, add one extra shot before going for a winner."
             ),
             Match(
                 date: Calendar.current.date(byAdding: .day, value: -1, to: .now)!,
                 opponentName: "Jordan Mills",
                 sport: .tennis,
-                notes: "Good dinking game today. Lost focus in the third game.",
+                notes: "Good dinking game today.",
                 matchFormat: .singles,
                 opponentNameSnapshots: ["Jordan Mills"]
             ),
@@ -166,7 +206,7 @@ extension Match {
                 date: Calendar.current.date(byAdding: .day, value: -3, to: .now)!,
                 opponentName: "Sam Rivera",
                 sport: .tennis,
-                notes: "Footwork was off. Need more lateral movement drills.",
+                notes: "Footwork was off.",
                 matchFormat: .singles,
                 opponentNameSnapshots: ["Sam Rivera"]
             ),

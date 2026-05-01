@@ -13,6 +13,11 @@ final class UserIdentityService {
     /// Stable anonymous UUID string, created once and reused across launches.
     let anonymousUserId: String
 
+    private static let linkedAppleIdKey = "PostPoint.linkedAppleId"
+
+    /// The Apple user ID linked to this anonymous identity, if any.
+    private(set) var linkedAppleId: String?
+
     private init() {
         if let existing = UserDefaults.standard.string(forKey: Self.userIdKey) {
             anonymousUserId = existing
@@ -21,5 +26,12 @@ final class UserIdentityService {
             UserDefaults.standard.set(newId, forKey: Self.userIdKey)
             anonymousUserId = newId
         }
+        linkedAppleId = UserDefaults.standard.string(forKey: Self.linkedAppleIdKey)
+    }
+
+    /// Links the anonymous user to an Apple ID from Sign in with Apple.
+    func linkAppleId(_ appleId: String) {
+        linkedAppleId = appleId
+        UserDefaults.standard.set(appleId, forKey: Self.linkedAppleIdKey)
     }
 }

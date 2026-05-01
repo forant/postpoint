@@ -27,7 +27,7 @@ struct DebriefService {
             matchPattern: input.matchPattern.rawValue,
             opponentLevel: input.opponentLevel.rawValue,
             context: buildContextString(from: input),
-            whatWorked: input.whatWorked?.rawValue,
+            whatWorked: input.allWhatWorked.isEmpty ? nil : input.allWhatWorked.map(\.rawValue).joined(separator: ", "),
             improvementAreas: input.improvementAreas?.map(\.rawValue),
             sport: input.sport.rawValue,
             scoringSystem: input.scoringSystem.rawValue,

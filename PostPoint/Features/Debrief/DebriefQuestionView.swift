@@ -7,6 +7,7 @@ struct DebriefQuestionView<Option: Hashable & Identifiable>: View where Option: 
     let selection: Set<Option>
     let multiSelect: Bool
     let maxSelections: Int
+    let helperText: String?
     let onSelect: (Option) -> Void
 
     init(
@@ -16,6 +17,7 @@ struct DebriefQuestionView<Option: Hashable & Identifiable>: View where Option: 
         selection: Set<Option>,
         multiSelect: Bool = false,
         maxSelections: Int = 1,
+        helperText: String? = nil,
         onSelect: @escaping (Option) -> Void
     ) {
         self.prompt = prompt
@@ -24,6 +26,7 @@ struct DebriefQuestionView<Option: Hashable & Identifiable>: View where Option: 
         self.selection = selection
         self.multiSelect = multiSelect
         self.maxSelections = maxSelections
+        self.helperText = helperText
         self.onSelect = onSelect
     }
 
@@ -34,7 +37,7 @@ struct DebriefQuestionView<Option: Hashable & Identifiable>: View where Option: 
                 .fixedSize(horizontal: false, vertical: true)
 
             if multiSelect {
-                Text("Select up to \(maxSelections)")
+                Text(helperText ?? "Select up to \(maxSelections)")
                     .font(AppFont.caption())
                     .foregroundStyle(AppColors.secondaryLabel)
             }
